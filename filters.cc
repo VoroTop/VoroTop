@@ -1,14 +1,15 @@
 ////////////////////////////////////////////////////////
 ////                                                ////
 ////   ******************************************   ////
-////   *                 VTop++                 *   ////
-////   *     Complete Voronoi Cell Topology     *   ////
-////   *   Analysis and Visualization Toolkit   *   ////
+////   *                                        *   ////
+////   *     VoroTop: Voronoi Cell Topology     *   ////
+////   *   Visualization and Analysis Toolkit   *   ////
 ////   *             (Version 0.3)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
 ////   *           December 5, 2014             *   ////
+////   *                                        *   ////
 ////   ******************************************   ////
 ////                                                ////
 ////////////////////////////////////////////////////////

@@ -1,14 +1,15 @@
 ////////////////////////////////////////////////////////
 ////                                                ////
 ////   ******************************************   ////
-////   *                 VTop++                 *   ////
-////   *     Complete Voronoi Cell Topology     *   ////
-////   *   Analysis and Visualization Toolkit   *   ////
+////   *                                        *   ////
+////   *     VoroTop: Voronoi Cell Topology     *   ////
+////   *   Visualization and Analysis Toolkit   *   ////
 ////   *             (Version 0.3)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
 ////   *           December 5, 2014             *   ////
+////   *                                        *   ////
 ////   ******************************************   ////
 ////                                                ////
 ////////////////////////////////////////////////////////
@@ -71,30 +72,33 @@ void print_variables()
 ////////////////////////////////////////////////////
 
 void help_message(void) {
-    puts("\n"
-         "   ******************************************\n"
-         "   *                 VTop++                 *\n"
-         "   *     Complete Voronoi Cell Topology     *\n"
-         "   *   Analysis and Visualization Toolkit   *\n"
-         "   *             (Version 0.3)              *\n"
-         "   *                                        *\n"
-         "   *           Emanuel A. Lazar             *\n"
-         "   *      University of Pennsylvania        *\n"
-         "   *           December 5, 2014             *\n"
-         "   ******************************************\n"
-         "                                             \n"
-         "Syntax: VTop++ <filename> [options]        \n\n"
-         "VTop++ reads an input file and computes the complete Voronoi cell topology for   \n"
-         "each point.  Input formats currently accepted include LAMMPS dump and AtomEye cfg\n"
-         "formats.  Output is determined by options.                                       \n"
+    std::cout <<
+         "   ********************************************\n"
+         "   *                                          *\n"
+         "   *      VoroTop: Voronoi Cell Topology      *\n"
+         "   *    Visualization and Analysis Toolkit    *\n"
+         "   *              (Version 0.3)               *\n"
+         "   *                                          *\n"
+         "   *            Emanuel A. Lazar              *\n"
+         "   *       University of Pennsylvania         *\n"
+         "   *            December 5, 2014              *\n"
+         "   *                                          *\n"
+         "   ********************************************\n"
+         "                                               \n"
+         "Syntax: VoroTop <filename> [options]           \n"
+         "                                               \n"
+         "         VoroTop reads an input file and computes the complete Voronoi cell      \n"
+         "         topology for each point.  Input formats currently accepted include      \n"
+         "         LAMMPS dump and AtomEye cfg formats.  Output is determined by options.  \n"
+         "                                                                                 \n"
          "                                                                                 \n"
          "Available options:                                                               \n"
          "                                                                                 \n"
          " -w    : Compute w-vector for each particle, save to file <filename>.wvectors.   \n"
          " -d    : Compute distribution of w-vectors, save to file <filename>.distribution.\n"
          " -g    : Compute distribution of w-vectors for perturbations of a system. This   \n"
-         "         option should be followed by two numbers, on specifying the number of   \n"
-         "         samples, the other indicating the size of the random perturbations.     \n"
+         "         option should be followed by two numbers, one specifying the number of  \n"
+         "         samples, the other specifying the size of the random perturbations.     \n"
          "                                                                                 \n"
          " -ff   : Generates a cfg file <filename>.cfg using a filter provided by the user.\n"
          " -df   : Generates a cfg file <filename>.cfg using a distribution of types in    \n"
@@ -102,6 +106,14 @@ void help_message(void) {
          "         topological type is given a unique structure ID; structure ID's of more \n"
          "         common types have larger numbers than those of less common types.  This \n"
          "         can be useful for studying new structures.                              \n"
+         "                                                                                 \n"
+         " -c    : Cluster analysis.  Particles with topological types not included in the \n"
+         "         specified filter are considered to be defects.  Defect particles with   \n"
+         "         adjacent Voronoi cells are considered to belong to the same defect; we  \n"
+         "         call each Voronoi-contiguous set of defect particles a cluster and      \n"
+         "         assign the constituent particles a unique index.  Similar cluster       \n"
+         "         analysis is also performed for types in the filter.  This option        \n"
+         "         requires loading a filter file for analysis.                            \n"
          "                                                                                 \n"
          " -o    : Specify output file primary name <filename>.  If requested, w-vectors   \n"
          "         will be saved to <filename>.wvectors; distribution will be saved to     \n"
@@ -111,9 +123,8 @@ void help_message(void) {
          "         must previously exist.                                                  \n"
          "                                                                                 \n"
          " -p    : Print to screen system variables.                                       \n"
-         " -f    : Print information about filters.                                        \n"
          " -h    : Print this information.                                                 \n"
-         "                                                                                 \n");
+         "                                                                                 \n";
 }
 
 
@@ -144,14 +155,14 @@ void parse_arguments(int argc, char *argv[])
     if(argc<2)
     {
         help_message();
-        std::cerr << "No input data file specified.\n\n";
+        std::cerr << "No input data file specified.\n\n\n";
         exit(-1);
     }
     
     if(argc<3)
     {
         help_message();
-        std::cerr << "No command-line options specified.\n\n";
+        std::cerr << "No command-line options specified.\n\n\n";
         exit(-1);
     }
     
@@ -265,7 +276,7 @@ void parse_arguments(int argc, char *argv[])
             else
             {
                 help_message();
-                std::cout << "-o option indicated but no output file specified.\n";
+                std::cout << "-o option indicated but no output file specified.\n\n";
                 exit(0);
             }
         }
