@@ -1,14 +1,15 @@
 ////////////////////////////////////////////////////////
 ////                                                ////
 ////   ******************************************   ////
-////   *                 VTop++                 *   ////
-////   *     Complete Voronoi Cell Topology     *   ////
-////   *   Analysis and Visualization Toolkit   *   ////
+////   *                                        *   ////
+////   *     VoroTop: Voronoi Cell Topology     *   ////
+////   *   Visualization and Analysis Toolkit   *   ////
 ////   *             (Version 0.3)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
 ////   *           December 5, 2014             *   ////
+////   *                                        *   ////
 ////   ******************************************   ////
 ////                                                ////
 ////////////////////////////////////////////////////////
@@ -59,7 +60,7 @@ extern std::vector <int> cluster_index;
 extern std::vector <int> cluster_sizes;
 
 
-extern int     n_x,n_y,n_z;
+extern int n_x,n_y,n_z;
 
 extern bool w_switch;    // PRINT W-VECTORS
 extern bool d_switch;    // CREATE DISTRIBUTION OF W-VECTORS

@@ -310,7 +310,6 @@ void import_dump_file(std::ifstream& fp, particle_order &vo, container_periodic 
 
 void import_atomeye_file(std::ifstream& fp, particle_order &vo, container_periodic &con)
 {
-    // SCANS THE LINE TO SEE HOW MANY VALUES WE HAVE AFTER THE x,y,z COORDINATES
     double x,y,z;
     std::string full_line;
 

@@ -187,13 +187,6 @@ void create_cfg_file(std::string filename, Filter &filter)
 
 
 
-// HERE IS WHAT WE WANT THIS CODE TO DO. GIVEN A FILTER,
-// CHECK ALL ATOMS WHETHER THEY BELONG TO SPECIFIED STRUCTURE.
-// NEXT, BUILD CLUSTERS OF CRYSTALS AND DEFECTS. FINALLY,
-// LABEL EVERY ATOM ACCORDING TO INDEX OF CLUSTER; USE
-// POSITIVE NUMBERS FOR ATOMS BELONGING TO CRYSTAL CLUSTERS
-// USE NEGATIVE NUBMERS FOR ATOMS BELONGING TO DEFECT CLUSTERS.
-
 ////////////////////////////////////////////////////
 ////
 ////   MAKE A CFG FILE USING FILTER, AND ALSO CLUSTERING
@@ -201,6 +194,7 @@ void create_cfg_file(std::string filename, Filter &filter)
 ////   DEFECTS, SUCH AS THOSE IN PHASE-TRANSITIONS.
 ////
 ////////////////////////////////////////////////////
+
 void   cluster_analysis(Filter &filter)
 {
     filter.sort_for_clustering();

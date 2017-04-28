@@ -1,14 +1,15 @@
 ////////////////////////////////////////////////////////
 ////                                                ////
 ////   ******************************************   ////
-////   *                 VTop++                 *   ////
-////   *     Complete Voronoi Cell Topology     *   ////
-////   *   Analysis and Visualization Toolkit   *   ////
+////   *                                        *   ////
+////   *     VoroTop: Voronoi Cell Topology     *   ////
+////   *   Visualization and Analysis Toolkit   *   ////
 ////   *             (Version 0.3)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
 ////   *           December 5, 2014             *   ////
+////   *                                        *   ////
 ////   ******************************************   ////
 ////                                                ////
 ////////////////////////////////////////////////////////
@@ -71,7 +72,7 @@ class Filter {
 public:
     Filter() : max_filter_type(0), max_file_filter_type(0) {}
     
-    void loadFilter(std::string);  //CompressedTextReader& stream
+    void loadFilter(std::string);  
     void print_distribution(std::string);
     void increment_or_add(std::vector<int> wvector) {increment_or_add(wvector,0);}
     void increment_or_add(std::vector<int>, int n);
