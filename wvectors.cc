@@ -131,10 +131,12 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     
     for(int orientation=0; orientation<2 && finished==0; orientation++)
     {
-        for(int q=0; q<vertex_count; q++)
+        for(int c=0; c<origins.size(); c++)
         {
-            for(int r=0; r<vertex_degrees[q] && finished==0; r++)
-            {
+//        for(int q=0; q<vertex_count; q++)
+//        {
+//            for(int r=0; r<vertex_degrees[q] && finished==0; r++)
+//            {
                 // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW (0)
                 for(int k=0; k<vertex_count; k++)
                     vertices_temp_labels[k] = 0;
@@ -142,15 +144,16 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                     for(int j=0;j<vertex_degrees[i];j++)
                         if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
 
-                int initial = q;
-                int branch  = r;
+                int initial = origins[c];
+                //int branch  = r;
+            
                 int next    = ed[initial][branch];
                 ed[initial][branch] = -1-next;
 
                 int current_code_length   = 0;
                 int current_highest_label = 1;
                 int continue_code         = 0;     // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
-                if(q==0 && r==0 && orientation==0) // FIRST CODE, GO AHEAD
+                if(q==0 && orientation==0) // FIRST CODE, GO AHEAD
                     continue_code=1;
                 
                 vertices_temp_labels[initial] = current_highest_label++;
@@ -221,8 +224,8 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                             current_code_length++;
                             
                             // FIND NEXT BRANCH, EASY IN THIS CASE
-                            initial = next;
                             branch  = next_branch;
+                            initial = next;
                             next    = ed[initial][branch];
                             ed[initial][branch] = -1-next;
                         }
@@ -239,7 +242,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                     }
                 }
             }
-        }
+        //}
     }
     
 
