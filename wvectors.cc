@@ -131,44 +131,92 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     
     for(int orientation=0; orientation<2 && finished==0; orientation++)
     {
-        for(int c=0; c<origins.size(); c++)
+        for(int q=0; q<origins.size() && finished==0; q++)
         {
-//        for(int q=0; q<vertex_count; q++)
-//        {
-//            for(int r=0; r<vertex_degrees[q] && finished==0; r++)
-//            {
-                // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW (0)
-                for(int k=0; k<vertex_count; k++)
-                    vertices_temp_labels[k] = 0;
-                for(int i=0;i<vertex_count;i++)
-                    for(int j=0;j<vertex_degrees[i];j++)
-                        if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
-
-                int initial = origins[c];
-                //int branch  = r;
+            // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW (0)
+            for(int k=0; k<vertex_count; k++)
+                vertices_temp_labels[k] = 0;
+            for(int i=0;i<vertex_count;i++)
+                for(int j=0;j<vertex_degrees[i];j++)
+                    if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
             
-                int next    = ed[initial][branch];
-                ed[initial][branch] = -1-next;
-
-                int current_code_length   = 0;
-                int current_highest_label = 1;
-                int continue_code         = 0;     // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
-                if(q==0 && orientation==0) // FIRST CODE, GO AHEAD
-                    continue_code=1;
-                
-                vertices_temp_labels[initial] = current_highest_label++;
-                wvector[current_code_length]  = vertices_temp_labels[initial];
-                current_code_length++;
-                
-                int end_flag=0;
-                while(end_flag==0)
+            int initial = origins[q];
+            int next;
+            int branch;
+            
+            if(orientation==0)
+            {
+                if((q+1)%min_face_edges==0) next = origins[q - min_face_edges + 1];
+                else next = origins[q + 1];
+            }
+            else // (orientation==1)
+            {
+                if(q    %min_face_edges==0) next = origins[q + min_face_edges - 1];
+                else next = origins[q - 1];
+            }
+            for(int j=0; j<vertex_degrees[origins[q]]; j++)
+                if(ed[origins[q]][j]==next) branch=j;
+            ed[initial][branch] = -1-next;
+            
+            
+            int current_code_length   = 0;
+            int current_highest_label = 1;
+            int continue_code         = 0;     // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
+            if(q==0 && orientation==0)         // FIRST CODE, GO AHEAD
+                continue_code=1;
+            
+            vertices_temp_labels[initial] = current_highest_label++;
+            wvector[current_code_length]  = vertices_temp_labels[initial];
+            current_code_length++;
+            
+            int end_flag=0;
+            while(end_flag==0)
+            {
+                // NEXT VERTEX HAS NOT BEEN VISITED; TAKE RIGHT-MOST BRANCH TO CONTINUE.
+                if(vertices_temp_labels[next]==0)
                 {
-                    // NEXT VERTEX HAS NOT BEEN VISITED; TAKE RIGHT-MOST BRANCH TO CONTINUE.
-                    if(vertices_temp_labels[next]==0)
+                    //   LABEL THE NEW VERTEX
+                    vertices_temp_labels[next] = current_highest_label++;
+                    
+                    if(continue_code==0)
                     {
-                        //   LABEL THE NEW VERTEX
-                        vertices_temp_labels[next] = current_highest_label++;
+                        if(vertices_temp_labels[next]>wvector[current_code_length]) break;
+                        if(vertices_temp_labels[next]<wvector[current_code_length])
+                        {
+                            symmetry_counter = 0;
+                            continue_code    = 1;
+                            if(orientation==1) chirality=1;
+                        }
+                    }
+                    
+                    //   BUILD THE CODE
+                    wvector[current_code_length] = vertices_temp_labels[next];
+                    current_code_length++;
+                    
+                    //   FIND THE NEXT DIRECTION TO MOVE ALONG
+                    //   UPDATE INITIAL AND BRANCH TO RELOOP
+                    if(orientation==0) branch  = vcell.cycle_up  (ed[initial][vertex_degrees[initial]+branch],next);
+                    else               branch  = vcell.cycle_down(ed[initial][vertex_degrees[initial]+branch],next);
+                    initial = next;
+                    next    = ed[initial][branch];
+                    ed[initial][branch] = -1-next;
+                }
+                
+                else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
+                {
+                    int next_branch = ed[initial][vertex_degrees[initial]+branch];  // BEGIN ON RETURN BRANCH
+                    int branches_tested = 0;
+                    
+                    while(ed[next][next_branch] < 0 && branches_tested<vertex_degrees[next])
+                    {
+                        if(orientation==0) next_branch = vcell.cycle_up  (next_branch,next);
+                        else               next_branch = vcell.cycle_down(next_branch,next);
                         
+                        branches_tested++;
+                    }
+                    
+                    if(branches_tested < vertex_degrees[next])
+                    {
                         if(continue_code==0)
                         {
                             if(vertices_temp_labels[next]>wvector[current_code_length]) break;
@@ -180,72 +228,33 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                             }
                         }
                         
-                        //   BUILD THE CODE
+                        // BUILD THE CODE
                         wvector[current_code_length] = vertices_temp_labels[next];
                         current_code_length++;
                         
-                        //   FIND THE NEXT DIRECTION TO MOVE ALONG
-                        //   UPDATE INITIAL AND BRANCH TO RELOOP
-                        if(orientation==0) branch  = vcell.cycle_up  (ed[initial][vertex_degrees[initial]+branch],next);
-                        else               branch  = vcell.cycle_down(ed[initial][vertex_degrees[initial]+branch],next);
+                        // FIND NEXT BRANCH, EASY IN THIS CASE
+                        branch  = next_branch;
                         initial = next;
                         next    = ed[initial][branch];
                         ed[initial][branch] = -1-next;
                     }
                     
-                    else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
+                    else
                     {
-                        int next_branch = ed[initial][vertex_degrees[initial]+branch];  // BEGIN ON RETURN BRANCH
-                        int branches_tested = 0;
+                        end_flag=1;
                         
-                        while(ed[next][next_branch] < 0 && branches_tested<vertex_degrees[next])
-                        {
-                            if(orientation==0) next_branch = vcell.cycle_up  (next_branch,next);
-                            else               next_branch = vcell.cycle_down(next_branch,next);
-
-                            branches_tested++;
-                        }
-
-                        if(branches_tested < vertex_degrees[next])
-                        {
-                            if(continue_code==0)
-                            {
-                                if(vertices_temp_labels[next]>wvector[current_code_length]) break;
-                                if(vertices_temp_labels[next]<wvector[current_code_length])
-                                {
-                                    symmetry_counter = 0;
-                                    continue_code    = 1;
-                                    if(orientation==1) chirality=1;
-                                }
-                            }
-                            
-                            // BUILD THE CODE
-                            wvector[current_code_length] = vertices_temp_labels[next];
-                            current_code_length++;
-                            
-                            // FIND NEXT BRANCH, EASY IN THIS CASE
-                            branch  = next_branch;
-                            initial = next;
-                            next    = ed[initial][branch];
-                            ed[initial][branch] = -1-next;
-                        }
-                        
-                        else
-                        {
-                            end_flag=1;
-                            
-                            if(likely_bcc && symmetry_counter>4 && orientation==0) { chirality=0; symmetry_counter = 48; finished=1; }
-                            else if(chirality==-1 && orientation==1)               { chirality=0; symmetry_counter *= 2; finished=1; }
-                            else symmetry_counter++;
-                        }
-                        
+                        if(likely_bcc && symmetry_counter>4 && orientation==0) { chirality=0; symmetry_counter = 48; finished=1; }
+                        else if(chirality==-1 && orientation==1)               { chirality=0; symmetry_counter *= 2; finished=1; }
+                        else symmetry_counter++;
                     }
+                    
                 }
             }
+        }
         //}
     }
     
-
+    //    exit(0);
     if(extended==0)
         wvector.push_back(1);
     
