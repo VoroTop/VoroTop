@@ -129,13 +129,23 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     int chirality  = -1;
     int symmetry_counter=0;     // TRACKS NUMBER OF REPEATS OF A CODE, I.E. SYMMETRY ORDER
     
-    
     for(int orientation=0; orientation<2 && finished==0; orientation++)
     {
+//         std::cout << orientation << '\n';
         for(int q=0; q<vertex_count; q++)
         {
+//            std::cout << "Vertex " << q << '\n';
             for(int r=0; r<vertex_degrees[q]; r++)
             {
+                // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW (0)
+                //std::cout << "About to clear all " << vertex_count << " temp_lables\n";
+                for(int k=0; k<vertex_count; k++)
+                    vertices_temp_labels[k] = 0;
+                for(int i=0;i<vertex_count;i++)
+                    for(int j=0;j<vertex_degrees[i];j++)
+                        if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
+
+//                std::cout << "Vertex " << q << ", branch " << r << '\n';
                 int initial = q;
                 int branch  = r;
                 int next    = ed[initial][branch];
@@ -147,9 +157,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                 if(q==0 && orientation==0)         // FIRST CODE, GO AHEAD
                     continue_code=1;
                 
-                // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW (0)
-                for(int k=0; k<vertex_count; k++)
-                    vertices_temp_labels[k] = 0;
+
                 
                 vertices_temp_labels[initial] = current_highest_label++;
                 wvector[current_code_length]  = vertices_temp_labels[initial];
@@ -158,10 +166,12 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                 int end_flag=0;
                 while(end_flag==0)
                 {
+//                    std::cout << "inside, and next is " << next << "\n";
 ///////
                     // NEXT VERTEX HAS NOT BEEN VISITED; TAKE RIGHT-MOST BRANCH TO CONTINUE.
                     if(vertices_temp_labels[next]==0)
                     {
+//                        std::cout << "Not visited\n";
                         //   LABEL THE NEW VERTEX
                         vertices_temp_labels[next] = current_highest_label++;
                         
@@ -182,14 +192,16 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                         
                         //   FIND THE NEXT DIRECTION TO MOVE ALONG
                         //   UPDATE INITIAL AND BRANCH TO RELOOP
-                        initial = next;
                         branch  = vcell.cycle_up(ed[initial][vertex_degrees[initial]+branch],next);
+                        initial = next;
                         next    = ed[initial][branch];
                         ed[initial][branch] = -1-next;
                     }
                     
                     else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
                     {
+//                        std::cout << "Visited " << vertices_temp_labels[next] << "\n";
+
                         int next_branch = ed[initial][vertex_degrees[initial]+branch];  // BEGIN ON RETURN BRANCH
                         int branches_tested = 0;
                         
@@ -240,7 +252,8 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
         
         // AFTER MAKING ALL CODES FOR ONE ORIENTATION, FLIP ORIENTATION OF EDGES AT EACH
         // VERTEX, AND REPEAT THE ABOVE FOR THE OPPOSITE ORIENTATION.
-        if(orientation==0)
+        
+        if(orientation==3)
         {
             for(int i=0;i<vertex_count;i++)
             {
@@ -258,8 +271,16 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                     ed[i][vertex_degrees[i]-j-1+vertex_degrees[i]] = temp;
                 }
             }
+            
+            for(int i=0;i<vertex_count;i++)
+                for(int j=0; j<vertex_degrees[i]; j++)
+                    ed[ed[i][j]][ed[i][vertex_degrees[i]+j]]=i;
         }
     }
+    
+//    for(int c=0; c<wvector.size(); c++)
+//        std::cout << wvector[c] << ",";
+//    std::cout << '\n';
     
     if(extended==0)
         wvector.push_back(1);
