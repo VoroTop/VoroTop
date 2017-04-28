@@ -1,0 +1,3 @@
+#	Icosahedral filter, Voronoi topology of the pentagonal dodecahedron, 12 faces, each with 5 edges
+*	1	ICO	Icosahedral
+1	(1,2,3,4,5,1,5,6,7,8,1,8,9,10,2,10,11,12,3,12,13,14,4,14,15,6,15,16,17,7,17,18,9,18,19,11,19,20,13,20,16,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
