@@ -129,127 +129,82 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     int chirality  = -1;
     int symmetry_counter=0;     // TRACKS NUMBER OF REPEATS OF A CODE, I.E. SYMMETRY ORDER
     
+    
     for(int orientation=0; orientation<2 && finished==0; orientation++)
     {
-        // WE ONLY CONSIDER PATHS BEGINNING WITH EDGES ALONG MINIMAL FACES
-        for(int q=0; q<origins.size() && finished==0; q++)
+        for(int q=0; q<vertex_count; q++)
         {
-            int current_code_length=0;
-            int current_highest_label=1;
-            int continue_code = 0;     // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
-            if(q==0 && orientation==0) // FIRST CODE, GO AHEAD
-                continue_code=1;
-            
-            // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW
-            for(int k=0; k<vertex_count; k++)
+            for(int r=0; r<vertex_degrees[q]; r++)
             {
-                vertices_temp_labels[k] = 0;
-                for(int l=0; l<vertex_degrees[k]; l++)
-                    vertex_visited[k][l] = 0;
-            }
-            
-            vertices_temp_labels[origins[q]] = current_highest_label++;
-            wvector[current_code_length]=vertices_temp_labels[origins[q]];
-            current_code_length++;
-            
-            int initial = origins[q];   // VERTEX WE ARE LEAVING, i IS IN {0,1,2,...,p-1}
-            int branch = -1;
-            
-            int twos;
-            if(orientation==0)
-            {
-                if((q+1)%min_face_edges==0) twos = origins[q - min_face_edges + 1];
-                else twos = origins[q + 1];
-            }
-            else // (orientation==1)
-            {
-                if(q    %min_face_edges==0) twos = origins[q + min_face_edges - 1];
-                else twos = origins[q - 1];
-            }
-            for(int j=0; j<vertex_degrees[origins[q]]; j++)
-                if(ed[origins[q]][j]==twos) branch=j;
-            
-            vertex_visited[initial][branch]=1;
-            
-            
-            // THIS SECTION BUILDS EACH CODE, FOLLOWING THE WEINBERG RULES FOR TRAVERSING A
-            // GRAPH MAKING A HAMILTONIAN PATH, LABELING THE VERTICES ALONG THE WAY, AND
-            // RECORDING THE VERTICES VISITED.
-            int end_flag=0;
-            while(end_flag==0)
-            {
-                // NEXT VERTEX HAS NOT BEEN VISITED BEFORE; TAKE RIGHT-MOST BRANCH TO CONTINUE.
-                if(vertices_temp_labels[ed[initial][branch]]==0)
-                {
-                    //   LABEL THE NEW VERTEX
-                    vertices_temp_labels[ed[initial][branch]] = current_highest_label++;
-                    
-                    if(continue_code==0)
-                    {
-                        if(vertices_temp_labels[ed[initial][branch]]>wvector[current_code_length]) break;
-                        if(vertices_temp_labels[ed[initial][branch]]<wvector[current_code_length])
-                        {
-                            symmetry_counter=0;
-                            continue_code=1;
-                            if(orientation==1) chirality=1;
-                        }
-                    }
-                    
-                    //   BUILD THE CODE
-                    wvector[current_code_length]=vertices_temp_labels[ed[initial][branch]];
-                    current_code_length++;
-                    
-                    //   FIND THE NEXT DIRECTION TO MOVE ALONG
-                    //   UPDATE INITIAL AND BRANCH TO RELOOP
-                    int old_branch = branch;
-                    branch  = ed[initial][branch+vertex_degrees[initial]]+1 == vertex_degrees[ed[initial][branch]]?0:ed[initial][branch+vertex_degrees[initial]]+1;
-                    initial = ed[initial][old_branch];
-                    vertex_visited[initial][branch]=1;
-                }
+                int initial = q;
+                int branch  = r;
+                int next    = ed[initial][branch];
+                ed[initial][branch] = -1-next;
+
+                int current_code_length   = 0;
+                int current_highest_label = 1;
+                int continue_code         = 0;     // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
+                if(q==0 && orientation==0)         // FIRST CODE, GO AHEAD
+                    continue_code=1;
                 
-                else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
+                // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW (0)
+                for(int k=0; k<vertex_count; k++)
+                    vertices_temp_labels[k] = 0;
+                
+                vertices_temp_labels[initial] = current_highest_label++;
+                wvector[current_code_length]  = vertices_temp_labels[initial];
+                current_code_length++;
+                
+                int end_flag=0;
+                while(end_flag==0)
                 {
-                    // IF RETURN BRANCH HAS NOT BEEN TAKEN
-                    if(vertex_visited[ed[initial][branch]][ed[initial][branch+vertex_degrees[initial]]]==0)
+///////
+                    // NEXT VERTEX HAS NOT BEEN VISITED; TAKE RIGHT-MOST BRANCH TO CONTINUE.
+                    if(vertices_temp_labels[next]==0)
                     {
+                        //   LABEL THE NEW VERTEX
+                        vertices_temp_labels[next] = current_highest_label++;
+                        
                         if(continue_code==0)
                         {
-                            if(vertices_temp_labels[ed[initial][branch]]>wvector[current_code_length]) break;
-                            if(vertices_temp_labels[ed[initial][branch]]<wvector[current_code_length])
+                            if(vertices_temp_labels[next]>wvector[current_code_length]) break;
+                            if(vertices_temp_labels[next]<wvector[current_code_length])
                             {
-                                symmetry_counter=0;
-                                continue_code=1;
+                                symmetry_counter = 0;
+                                continue_code    = 1;
                                 if(orientation==1) chirality=1;
                             }
                         }
                         
-                        // BUILD THE CODE
-                        wvector[current_code_length]=vertices_temp_labels[ed[initial][branch]];
+                        //   BUILD THE CODE
+                        wvector[current_code_length] = vertices_temp_labels[next];
                         current_code_length++;
                         
-                        // FIND NEXT BRANCH, EASY IN THIS CASE
-                        int old_branch = branch;
-                        branch  = ed[initial][branch+vertex_degrees[initial]];
-                        initial = ed[initial][old_branch];
-                        vertex_visited[initial][branch]=1;
+                        //   FIND THE NEXT DIRECTION TO MOVE ALONG
+                        //   UPDATE INITIAL AND BRANCH TO RELOOP
+                        initial = next;
+                        branch  = vcell.cycle_up(ed[initial][vertex_degrees[initial]+branch],next);
+                        next    = ed[initial][branch];
+                        ed[initial][branch] = -1-next;
                     }
                     
-                    // IF RETURN BRANCH *HAS* BEEN TAKEN ALREADY
-                    else
+                    else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
                     {
-                        // FINDS NEXT OPEN BRANCH IF EXISTS
-                        int index = ed[initial][branch+vertex_degrees[initial]]+1 == vertex_degrees[ed[initial][branch]]?0:ed[initial][branch+vertex_degrees[initial]]+1;
-                        while(index != ed[initial][branch+vertex_degrees[initial]] && vertex_visited[ed[initial][branch]][index]!=0)
-                            index = index+1 == vertex_degrees[ed[initial][branch]]?0:index+1;
+                        int next_branch = ed[initial][vertex_degrees[initial]+branch];  // BEGIN ON RETURN BRANCH
+                        int branches_tested = 0;
                         
-                        // IF SUCH A BRANCH EXISTS
-                        if(vertex_visited[ed[initial][branch]][index]==0)
+                        while(ed[next][next_branch] < 0 && branches_tested<vertex_degrees[next])
                         {
-                            // BUILD THE CODE
+                            next_branch = vcell.cycle_up(next_branch,next);
+                            branches_tested++;
+                        }
+
+                        if(branches_tested < vertex_degrees[next])
+                        {
                             if(continue_code==0)
                             {
-                                if(vertices_temp_labels[ed[initial][branch]]>wvector[current_code_length]) break;
-                                if(vertices_temp_labels[ed[initial][branch]]<wvector[current_code_length])
+                                if(vertices_temp_labels[next]>wvector[current_code_length]) break;
+                                if(vertices_temp_labels[next]<wvector[current_code_length])
                                 {
                                     symmetry_counter=0;
                                     continue_code=1;
@@ -257,17 +212,17 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                                 }
                             }
                             
-                            if(continue_code==1)    // I THINK WE CAN REMOVE THIS CONDITIONAL
-                                wvector[current_code_length]=vertices_temp_labels[ed[initial][branch]];
+                            // BUILD THE CODE
+                            wvector[current_code_length] = vertices_temp_labels[next];
                             current_code_length++;
                             
-                            int old_branch = branch;
-                            branch  = index;
-                            initial = ed[initial][old_branch];
-                            vertex_visited[initial][branch]=1;
+                            // FIND NEXT BRANCH, EASY IN THIS CASE
+                            initial = next;
+                            branch  = next_branch;
+                            next    = ed[initial][branch];
+                            ed[initial][branch] = -1-next;
                         }
                         
-                        // NO OPEN BRANCH EXISTS; CODE COMPLETED.
                         else
                         {
                             end_flag=1;
@@ -276,7 +231,9 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                             else if(chirality==-1 && orientation==1)               { chirality=0; symmetry_counter *= 2; finished=1; }
                             else symmetry_counter++;
                         }
+                        
                     }
+///////
                 }
             }
         }
