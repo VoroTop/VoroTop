@@ -55,7 +55,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     std::vector<int> pvector(5,0);  // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES
     int min_face_edges = 5;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
     bool stable = 1;
-    int origins[2048]={};           // NO VORONOI CELL WILL HAVE MORE THAN 1024 EDGES
+    int origins[4096]={};           // NO VORONOI CELL WILL HAVE MORE THAN 2048 EDGES
     int origin_c=0;
     
     // DETERMINE VERTICES ON FACES WITH MINIMAL EDGES, AND FACES WITH DIFFERENT NUMBERS OF EDGES
@@ -68,13 +68,12 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
             int k = ed[i][j];
             if(k >= 0)
             {
-                int face[1024]={};
+                int face[2048]={};
                 int face_c=0;
                 
                 ed[i][j]=-1-k;      // INDICATE THAT WE HAVE CHECKED THIS VERTEX
                 int l=vcell.cycle_up(ed[i][vertex_degrees[i]+j],k);
                 face[face_c++]=k;
-
                 do {
                     int m=ed[k][l];
                     ed[k][l]=-1-m;
