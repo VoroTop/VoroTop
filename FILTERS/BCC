@@ -1,3 +1,0 @@
-#	Body-centered cubic filter, Voronoi topology of the truncated octahedron, 6 square faces and 8 hexagonal faces
-*	1	BCC	Body-centered cubic
-1	(1,2,3,4,1,4,5,6,7,8,1,8,9,10,11,2,11,12,13,14,3,14,15,16,5,16,17,6,17,18,19,20,7,20,9,20,19,21,22,10,22,12,22,21,23,24,13,24,15,24,23,18,23,21,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1)
