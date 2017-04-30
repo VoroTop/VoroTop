@@ -55,7 +55,8 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     std::vector<int> pvector(5,0);  // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES
     int min_face_edges = 5;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
     bool stable = 1;
-    std::vector<int> origins;
+    int origins[2048]={};           // NO VORONOI CELL WILL HAVE MORE THAN 1024 EDGES
+    int origin_c=0;
     
     // DETERMINE VERTICES ON FACES WITH MINIMAL EDGES, AND FACES WITH DIFFERENT NUMBERS OF EDGES
     for(int i=0;i<vertex_count;i++)
@@ -67,34 +68,41 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
             int k = ed[i][j];
             if(k >= 0)
             {
-                std::vector<int> face;
+                int face[1024]={};
+                int face_c=0;
                 
                 ed[i][j]=-1-k;      // INDICATE THAT WE HAVE CHECKED THIS VERTEX
                 int l=vcell.cycle_up(ed[i][vertex_degrees[i]+j],k);
-                face.push_back(k);
+                face[face_c++]=k;
+
                 do {
                     int m=ed[k][l];
                     ed[k][l]=-1-m;
                     l=vcell.cycle_up(ed[k][vertex_degrees[k]+l],m);
                     k=m;
                     
-                    face.push_back(m);
+                    face[face_c++]=m;
                 } while (k!=i);
                 
                 // KEEP TRACK OF MINIMAL FACE EDGES
-                if(face.size()<min_face_edges)
+                if(face_c<min_face_edges)
                 {
-                    origins = face;
-                    min_face_edges = face.size();
+                    min_face_edges = origin_c = face_c;
+                    for(int c=0; c<face_c; c++)
+                        origins[c] = face[c];
                 }
-                else if(face.size()==min_face_edges)
-                    origins.insert(origins.end(), face.begin(), face.end());
+                else if(face_c==min_face_edges)
+                {
+                    for(int c=0; c<face_c; c++)
+                        origins[origin_c+c] = face[c];
+                    origin_c += face_c;
+                }
                 
-                if(face.size()<pvector.size()) pvector[face.size()]++;
+                if(face_c<pvector.size()) pvector[face_c]++;
                 else
                 {
-                    pvector.resize(face.size()+1,0);
-                    pvector[face.size()]++;
+                    pvector.resize(face_c+1,0);
+                    pvector[face_c]++;
                 }
                 
                 face_count++;
@@ -125,7 +133,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     
     for(int orientation=0; orientation<2 && finished==0; orientation++)
     {
-        for(int q=0; q<origins.size() && finished==0; q++)
+        for(int q=0; q<origin_c && finished==0; q++)
         {
             // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW
             std::fill(vertices_temp_labels.begin(), vertices_temp_labels.end(), 0);
