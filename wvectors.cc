@@ -51,11 +51,12 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     int*  vertex_degrees = vcell.nu;   // VERTEX DEGREE ARRAY
     int** ed             = vcell.ed;   // EDGE CONNECTIONS ARRAY
     
-    unsigned int face_count = 0;
-    std::vector<int> pvector(5,0);  // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES
-    int min_face_edges = 5;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
     bool stable = 1;
-    int origins[4096]={};           // NO VORONOI CELL WILL HAVE MORE THAN 2048 EDGES
+    int face_count     = 0;
+    int max_face_edges = 3;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 3 OR MORE EDGES
+    int min_face_edges = 5;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
+    int pvector[1024]  = {};        // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES, NO FACE HAS MORE THAN 1024 EDGES
+    int origins[4096]  = {};        // NO VORONOI CELL WILL HAVE MORE THAN 2048 EDGES
     int origin_c=0;
     
     // DETERMINE VERTICES ON FACES WITH MINIMAL EDGES, AND FACES WITH DIFFERENT NUMBERS OF EDGES
@@ -68,7 +69,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
             int k = ed[i][j];
             if(k >= 0)
             {
-                int face[2048]={};
+                int face[1024]={};  // NO SINGLE FACE WILL HAVE MORE THAN 1024 EDGES
                 int face_c=0;
                 
                 ed[i][j]=-1-k;      // INDICATE THAT WE HAVE CHECKED THIS VERTEX
@@ -83,7 +84,9 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                     face[face_c++]=m;
                 } while (k!=i);
                 
-                // KEEP TRACK OF MINIMAL FACE EDGES
+                // KEEP TRACK OF MINIMAL AND MAXIMAL FACE EDGES
+                if(face_c>max_face_edges)
+                    max_face_edges = face_c;
                 if(face_c<min_face_edges)
                 {
                     min_face_edges = origin_c = face_c;
@@ -96,14 +99,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
                         origins[origin_c+c] = face[c];
                     origin_c += face_c;
                 }
-                
-                if(face_c<pvector.size()) pvector[face_c]++;
-                else
-                {
-                    pvector.resize(face_c+1,0);
-                    pvector[face_c]++;
-                }
-                
+                pvector[face_c]++;
                 face_count++;
             }
         }
@@ -258,13 +254,13 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     
     else // extended==1
     {
-        for(unsigned int i=3; i<pvector.size(); i++)
+        for(unsigned int i=3; i<max_face_edges+1; i++)
             canonical_code.push_back(pvector[i]);
         canonical_code.push_back(face_count);
         canonical_code.push_back(symmetry_counter);
         canonical_code.push_back(chirality);
         canonical_code.push_back(stable);
-        canonical_code.push_back(pvector.size());
+        canonical_code.push_back(max_face_edges+1);
         canonical_code.push_back(2*edge_count);
     }
     
