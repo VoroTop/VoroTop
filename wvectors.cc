@@ -120,7 +120,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     ////////////////////////////////////////////////////////////////
     
     std::vector<int> canonical_code(2*edge_count);             // CANONICAL CODE WILL BE STORED HERE
-    std::vector<int> vertices_temp_labels(vertex_count,0);     // TEMPORARY LABELS FOR ALL VERTICES
+    int vertices_temp_labels[2048] = {};        // TEMPORARY LABELS FOR ALL VERTICES; MAX 2048 VERTICES
 
     int finished   =  0;
     int chirality  = -1;
@@ -131,7 +131,8 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
         for(int q=0; q<origin_c && finished==0; q++)
         {
             // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW
-            std::fill(vertices_temp_labels.begin(), vertices_temp_labels.end(), 0);
+            std::fill(vertices_temp_labels, vertices_temp_labels+vertex_count, 0);
+            
             for(int i=0;i<vertex_count;i++)
                 for(int j=0;j<vertex_degrees[i];j++)
                     if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
