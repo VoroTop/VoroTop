@@ -322,16 +322,16 @@ void Filter::sort_for_clustering(void)
 
 int  Filter::get_entry_type (int n)
 {
-    if(n>0) return entries[n].type;
-    else    return 0;
+    if(n>=0) return entries[n].type;
+    else     return 0;
 }
 
 
 
 int  Filter::get_entry_count(int n)
 {
-    if(n>0) return entries[n].count;
-    else    return 0;
+    if(n>=0) return entries[n].count;
+    else     return 0;
 }
 
 
