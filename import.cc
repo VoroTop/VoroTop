@@ -24,10 +24,8 @@
 #include <iostream>
 
 #include "import.hh"
-#include "voro++.hh"
 #include "filters.hh"
 #include "vorotop.hh"
-#include "functions.hh"
 
 using namespace voro;
 

@@ -21,8 +21,6 @@
 #define __FUNCTIONS_H_INCLUDED__  
 
 
-unsigned int countWordsInString(std::string const& str);
-
 void help_message   (void);
 void print_variables(void);
 void parse_arguments(int argc, char *argv[]);

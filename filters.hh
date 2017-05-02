@@ -23,7 +23,7 @@
 
 #include "voro++.hh"
 #include <vector>
-
+#include <algorithm>
 
 struct FilterEntry
 {
@@ -70,7 +70,7 @@ class Filter {
     
 
 public:
-    Filter() : max_filter_type(0), max_file_filter_type(0) {}
+    Filter() : max_file_filter_type(0), max_filter_type(0) {}
     
     void loadFilter(std::string);  
     void print_distribution(std::string);
@@ -85,14 +85,15 @@ public:
     
     int  get_entry_type (int n);
     int  get_entry_count(int n);
-    void sort_by_wvector(void) { sort(entries.begin(), entries.end(), compByWvector); }
-    void sort_by_count(void) { sort(entries.begin(), entries.end(), compByCount); }
-    void sort_by_type(void) { sort(entries.begin(), entries.end(), compByType); }
-    void sort_by_type_then_count(void) {sort(entries.begin(), entries.end(), compByTypeThenCount);}
+    void sort_by_wvector(void) { std::sort(entries.begin(), entries.end(), compByWvector); }
+    void sort_by_count(void) { std::sort(entries.begin(), entries.end(), compByCount); }
+    void sort_by_type(void) { std::sort(entries.begin(), entries.end(), compByType); }
+    void sort_by_type_then_count(void) {std::sort(entries.begin(), entries.end(), compByTypeThenCount);}
     void sort_dist_by_count(void);
     void sort_for_clustering(void);
 };
 
+unsigned int countWordsInString(std::string const& str);
 
 bool compByCount  (FilterEntry a, FilterEntry b);
 bool compByWvector(FilterEntry a, FilterEntry b);

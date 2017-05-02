@@ -59,8 +59,6 @@
 #include <iterator>
 #include <algorithm>
 
-#include "import.hh"
-#include "voro++.hh"
 #include "filters.hh"
 #include "vorotop.hh"
 

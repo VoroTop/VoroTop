@@ -17,6 +17,7 @@
 ////   File: functions.cc
 
 
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <iostream>

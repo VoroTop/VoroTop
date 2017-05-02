@@ -24,10 +24,8 @@
 
 #include "mtrand.h"
 #include "import.hh"
-#include "voro++.hh"
 #include "filters.hh"
 #include "vorotop.hh"
-#include "functions.hh"
 
 using namespace voro;
 
@@ -438,25 +436,24 @@ int print_wvectors(std::string filename)
     
     for(int c=0; c<number_of_particles; c++)
     {
-        std::vector<int> extended_wvector = all_wvectors[c];
-        int  length = extended_wvector.back();                          // LENGTH OF WVECTOR
-        int plength = extended_wvector.end()[-2];//back()-1;            // LENGTH OF PVECTOR
+        int  length = all_wvectors[c].back();                          // LENGTH OF WVECTOR
+        int plength = all_wvectors[c].end()[-2];//back()-1;            // LENGTH OF PVECTOR
         
-        wvector_file << extended_wvector[length+plength-3] << '\t';     // NUMBER OF FACES
+        wvector_file << all_wvectors[c][length+plength-3] << '\t';     // NUMBER OF FACES
         
         wvector_file << '(';                                            // P VECTOR
-        for(int c=length; c<length+plength-4; c++)
-            wvector_file << extended_wvector[c] << ',';
-        wvector_file << extended_wvector[length+plength-4] << ')' << '\t';
+        for(int d=length; d<length+plength-4; d++)
+            wvector_file << all_wvectors[c][d] << ',';
+        wvector_file << all_wvectors[c][length+plength-4] << ')' << '\t';
         
         wvector_file << '(';                                            // WEINBERG VECTOR
-        for(int c=0; c<length; c++)
-            wvector_file << extended_wvector[c] << ',';
+        for(int d=0; d<length; d++)
+            wvector_file << all_wvectors[c][d] << ',';
         wvector_file << 1 << ')' << '\t';
         
-        wvector_file << extended_wvector[length+plength-2] << '\t';     // SYMMETRIES
-        wvector_file << extended_wvector[length+plength-1] << '\t';     // CHIRALITY
-        wvector_file << extended_wvector[length+plength]   << '\t';     // STABLE
+        wvector_file << all_wvectors[c][length+plength-2] << '\t';     // SYMMETRIES
+        wvector_file << all_wvectors[c][length+plength-1] << '\t';     // CHIRALITY
+        wvector_file << all_wvectors[c][length+plength]   << '\t';     // STABLE
         
         wvector_file << '\n';
     }

@@ -6,11 +6,13 @@
 # Date   : December 5, 2014
 
 # C++ compiler
-CXX=g++ -g
+CXX      = g++ 
 
 # Flags for the C++ compiler
-LFLAGS=-L./voro++-0.5/src -lvoro++ 
-E_INC=-I./voro++-0.5/src
+LFLAGS   = -L./voro++-0.5/src -lvoro++ 
+LIBS     = -I./voro++-0.5/src
+CXXFLAGS = -Wall -O3 -c -std=c++11 
+
 
 vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o output.o mtrand.o
 	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o output.o mtrand.o $(LFLAGS) -o VoroTop
@@ -18,30 +20,33 @@ vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o function
 subsystem:
 	$(MAKE) -C voro++-0.5
 
-vorotop.o : vorotop.cc
-	$(CXX) $(E_INC) -c vorotop.cc
+vorotop.o : vorotop.cc import.hh filters.hh vorotop.hh functions.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) vorotop.cc
 
-wvectors.o : wvectors.cc
-	$(CXX) $(E_INC) -c wvectors.cc
+wvectors.o : wvectors.cc filters.hh vorotop.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) wvectors.cc
 
 variables.o : variables.cc
-	$(CXX) $(E_INC) -c variables.cc
+	$(CXX) $(CXXFLAGS) $(LIBS) variables.cc
 
-filters.o : filters.cc
-	$(CXX) $(E_INC) -c filters.cc
+filters.o : filters.cc filters.hh vorotop.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) filters.cc
 
-import.o : import.cc
-	$(CXX) $(E_INC) -c import.cc
+import.o : import.cc import.hh filters.hh vorotop.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) import.cc
 
-functions.o : functions.cc
-	$(CXX) $(E_INC) -c functions.cc
+functions.o : functions.cc filters.hh vorotop.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) functions.cc
 
-output.o : output.cc
-	$(CXX) $(E_INC) -c output.cc
+output.o : output.cc import.hh filters.hh vorotop.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) output.cc
 
 mtrand.o : mtrand.cpp
-	$(CXX) $(E_INC) -c mtrand.cpp
+	$(CXX) $(CXXFLAGS) $(LIBS) mtrand.cpp
 
 zip :
-	zip -r package.zip *.cc *.hh *.cpp *.h LICENSE README Makefile voro++-0.5 
+	zip -r package.zip *.cc *.hh *.cpp *.h LICENSE README Makefile voro++-0.5 -x voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++ 
+
+clean :
+	rm -f *.o voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++
 

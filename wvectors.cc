@@ -46,18 +46,22 @@ std::vector<int> calc_wvector(voronoicell_base &vcell)
 
 std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
 {
-    int   edge_count     = vcell.number_of_edges();                    
+    const int max_epf = 256;    // MAXIMUM EDGES PER FACE
+    const int max_epc = 512;    // MAXIMUM EDGES PER CELL
+    const int max_vpc = 512;    // MAXIMUM VERTICES PER CELL
+    
+    int   edge_count     = vcell.number_of_edges();
     int   vertex_count   = vcell.p;    // TOTAL NUMBER OF VERTICES
     int*  vertex_degrees = vcell.nu;   // VERTEX DEGREE ARRAY
     int** ed             = vcell.ed;   // EDGE CONNECTIONS ARRAY
     
     bool stable = 1;
-    int face_count     = 0;
-    int max_face_edges = 3;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 3 OR MORE EDGES
-    int min_face_edges = 5;         // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
-    int pvector[1024]  = {};        // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES, NO FACE HAS MORE THAN 1024 EDGES
-    int origins[4096]  = {};        // NO VORONOI CELL WILL HAVE MORE THAN 2048 EDGES
-    int origin_c=0;
+    int face_count         = 0;
+    int max_face_edges     = 3;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 3 OR MORE EDGES
+    int min_face_edges     = 5;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
+    int pvector[max_epf]   = {};    // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES, NO FACE IN FILTER HAS MORE THAN max_epf-1 EDGES
+    int origins[2*max_epc] = {};    // NO VORONOI CELL IN FILTER HAS MORE THAN max_epc EDGES
+    int origin_c           = 0;
     
     // DETERMINE VERTICES ON FACES WITH MINIMAL EDGES, AND FACES WITH DIFFERENT NUMBERS OF EDGES
     for(int i=0;i<vertex_count;i++)
@@ -69,7 +73,7 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
             int k = ed[i][j];
             if(k >= 0)
             {
-                int face[1024]={};  // NO SINGLE FACE WILL HAVE MORE THAN 1024 EDGES
+                int face[max_epf]={};  // NO SINGLE FACE WILL HAVE MORE THAN max_epf EDGES
                 int face_c=0;
                 
                 ed[i][j]=-1-k;      // INDICATE THAT WE HAVE CHECKED THIS VERTEX
@@ -119,8 +123,9 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     // BUILD THE CANONICAL CODE
     ////////////////////////////////////////////////////////////////
     
-    std::vector<int> canonical_code(2*edge_count);             // CANONICAL CODE WILL BE STORED HERE
-    int vertices_temp_labels[2048] = {};        // TEMPORARY LABELS FOR ALL VERTICES; MAX 2048 VERTICES
+    using WeinbergVector = std::vector<int>;
+    WeinbergVector canonical_code(2*edge_count,0);  // CANONICAL CODE WILL BE STORED HERE
+    int vertices_temp_labels[max_vpc] = {};         // TEMPORARY LABELS FOR ALL VERTICES; MAX max_vpc VERTICES
 
     int finished   =  0;
     int chirality  = -1;
