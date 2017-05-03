@@ -152,8 +152,7 @@ void Filter::increment_or_add(std::vector<int> wvector, int count)
 {
     std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
     
-    if (it != entries.end())
-        it->second.count += count;
+    if (it != entries.end()) it->second.count += count;
     else
         entries.insert({std::move(wvector), FilterEntry(++max_filter_type, count, 1)});
 }
@@ -190,7 +189,7 @@ void Filter::print_distribution(std::string filename)
     distribution_file << "#\tColumns indicate: type, Weinberg vector, and count\n";
     
     // OUTPUT THE DISTRIBUTION
-    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin() ; it != entries.end(); ++it) if(it->second.count>0)
+    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it) if(it->second.count>0)
     {
         distribution_file << it->second.type << '\t';
         distribution_file << '(';
@@ -213,8 +212,7 @@ int Filter::wvector_type(std::vector<int> wvector)
 {
     std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
     if (it != entries.end()) return it->second.type;
-//        return it->second.type <= file_filter_types ? it->second.type : 0;
-    else return 0;
+    else                     return 0;
 }
 
 

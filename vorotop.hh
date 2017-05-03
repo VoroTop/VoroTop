@@ -76,8 +76,6 @@ extern bool h_switch;    // PRINT HELP MENU
 extern int     perturbation_samples;
 extern double  perturbation_size;
 
-
-
 #endif
 
 

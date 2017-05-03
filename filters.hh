@@ -53,16 +53,13 @@ public:
     
     void loadFilter(std::string);
     void print_distribution(std::string);
-
-    void increment_or_add(std::vector<int> wvector) {increment_or_add(wvector,0);}
-    void increment_or_add(std::vector<int>, int n);
     
-    int  wvector_type(std::vector<int>);
+    int  wvector_type    (std::vector<int>);
+    void increment_or_add(std::vector<int>, int n);
 
-    int  get_max_type(void)    { return max_filter_type; }
+    int  get_max_type   (void) { return max_filter_type; }
     int  get_max_ff_type(void) { return max_file_filter_type; }
 };
-
 
 
 unsigned int countWordsInString(std::string const& str);

@@ -15,7 +15,7 @@ CXXFLAGS = -Wall -O3 -c -std=c++11
 
 
 vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o output.o 
-	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o output.o mtrand.o $(LFLAGS) -o VoroTop
+	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o output.o $(LFLAGS) -o VoroTop
 
 subsystem:
 	$(MAKE) -C voro++-0.5
