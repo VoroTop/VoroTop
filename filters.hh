@@ -31,10 +31,22 @@ struct FilterEntry
 {
     int type;
     int count;
-    bool source; // 0 filter file, 1 data
+    int source; // 0 filter file, 1 data
     
     FilterEntry(int t) : type(t) {};
     FilterEntry(int t, int c, bool s) : type(t), count(c), source(s) {};
+};
+
+
+
+struct SortEntry
+{
+    std::vector<int> wvector;
+    int type;
+    int count;
+    int source; // 0 filter file, 1 data
+    
+    SortEntry(std::vector<int> w, int t, int c, int s) : wvector(w), type(t), count(c), source(s) {};
 };
 
 
