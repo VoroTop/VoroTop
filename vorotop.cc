@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
     ////
     ////////////////////////////////////////////////////
 
-    FilterN filter;
+    Filter filter;
     if(f_switch) filter.loadFilter(filename_filter);
 
     
