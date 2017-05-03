@@ -21,6 +21,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <random>
 
 #include "mtrand.h"
 #include "import.hh"
@@ -378,7 +379,8 @@ void   cluster_analysis(Filter &filter)
 
 void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Filter &filter)
 {
-    MTRand_open mtrand; // random float in (0, 1), using Mersenne Twister
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution(0., perturbation_size);
     
     for(int loop = 0; loop < perturbation_samples; loop++)
     {
@@ -398,19 +400,9 @@ void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Fil
             pid = vlo.id[vlo.ijk][vlo.q];
             vlo.pos(x,y,z);
             
-            double rand1 = mtrand();
-            double rand2 = mtrand();
-            double rand3 = mtrand();
-            double rand4 = mtrand();
-            
-            // GENERATE GAUSSIAN NOISE USING Box–Muller TRANSFORM
-            double randx = sqrt(-2.*log(rand1))*cos(2.*M_PI*rand2)*perturbation_size;
-            double randy = sqrt(-2.*log(rand1))*sin(2.*M_PI*rand2)*perturbation_size;
-            double randz = sqrt(-2.*log(rand3))*cos(2.*M_PI*rand4)*perturbation_size;
-            
-            x += randx;
-            y += randy;
-            z += randz;
+            x += distribution(generator);
+            y += distribution(generator);
+            z += distribution(generator);
             
             // ADD ``PERTURBED'' COPY
             conP.put(voP,pid,x,y,z);

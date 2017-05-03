@@ -14,7 +14,7 @@ LIBS     = -I./voro++-0.5/src
 CXXFLAGS = -Wall -O3 -c -std=c++11 
 
 
-vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o output.o mtrand.o
+vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o output.o 
 	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o output.o mtrand.o $(LFLAGS) -o VoroTop
 
 subsystem:
@@ -41,11 +41,8 @@ functions.o : functions.cc filters.hh vorotop.hh
 output.o : output.cc import.hh filters.hh vorotop.hh
 	$(CXX) $(CXXFLAGS) $(LIBS) output.cc
 
-mtrand.o : mtrand.cpp
-	$(CXX) $(CXXFLAGS) $(LIBS) mtrand.cpp
-
 zip :
-	zip -r package.zip *.cc *.hh *.cpp *.h LICENSE README Makefile voro++-0.5 -x voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++ 
+	zip -r package.zip *.cc *.hh LICENSE README Makefile voro++-0.5 -x voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++ 
 
 clean :
 	rm -f *.o voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++
