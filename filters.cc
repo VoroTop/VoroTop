@@ -161,8 +161,17 @@ void Filter::increment_or_add(std::vector<int> wvector, int count)
 
 bool compareByCount(const SortEntry &a, const SortEntry &b)
 {
+    //if(a.count==b.count)
+    //    return a.wvector < b.wvector;
+    //else return a.count > b.count;
+
     if(a.count==b.count)
-        return a.wvector < b.wvector;
+    {
+        if(a.wvector.size() == b.wvector.size())
+            return a.wvector < b.wvector;
+        else return
+            a.wvector.size() < b.wvector.size();
+    }
     else return a.count > b.count;
 }
 
