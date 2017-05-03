@@ -161,17 +161,8 @@ void Filter::increment_or_add(std::vector<int> wvector, int count)
 
 bool compareByCount(const SortEntry &a, const SortEntry &b)
 {
-    //if(a.count==b.count)
-    //    return a.wvector < b.wvector;
-    //else return a.count > b.count;
-
-    if(a.count==b.count)
-    {
-        if(a.wvector.size() == b.wvector.size())
-            return a.wvector < b.wvector;
-        else return
-            a.wvector.size() < b.wvector.size();
-    }
+    if(a.count == b.count)
+        return a.wvector < b.wvector;
     else return a.count > b.count;
 }
 
@@ -210,12 +201,10 @@ void Filter::print_distribution(std::string filename)
     std::sort(sorted_entries.begin(), sorted_entries.end(), compareByCount);
     
     // OUTPUT THE DISTRIBUTION
-    //for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it) if(it->second.count>0)
-    int index=0;
+    int index = 0;
     for(std::vector<SortEntry>::iterator it = sorted_entries.begin(); it != sorted_entries.end(); ++it) if(it->count>0)
     {
         distribution_file << ++index << '\t';
-        //distribution_file << it->type << '\t';
         distribution_file << '(';
         for(int i=0; i<it->wvector.size()-1; i++)
             distribution_file << it->wvector[i] << ',';
