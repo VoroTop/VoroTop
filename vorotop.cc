@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
     else
     {
         calc_all_wvectors(con,vo,0);
+
         if(d_switch || df_switch)             calc_distribution(filter);
         if(g_switch)                          calc_gaussian_distribution(con,vo,filter);
         if(d_switch || df_switch || g_switch) filter.print_distribution(name_of_data_file);

@@ -33,20 +33,16 @@ struct FilterEntry
     int count;
     int source; // 0 filter file, 1 data
     
-    FilterEntry(int t) : type(t) {};
-    FilterEntry(int t, int c, bool s) : type(t), count(c), source(s) {};
+    FilterEntry(int t)               : type(t), count(0), source(0) {};
+    FilterEntry(int t, int c, int s) : type(t), count(c), source(s) {};
 };
 
 
 
 struct SortEntry
 {
-    std::vector<int> wvector;
-    int type;
-    int count;
-    int source; // 0 filter file, 1 data
-    
-    SortEntry(std::vector<int> w, int t, int c, int s) : wvector(w), type(t), count(c), source(s) {};
+    std::map<std::vector<int>,FilterEntry>::iterator it;
+    SortEntry(std::map<std::vector<int>,FilterEntry>::iterator i) : it(i) {};
 };
 
 
@@ -65,12 +61,14 @@ public:
     
     void loadFilter(std::string);
     void print_distribution(std::string);
+    void relabel_data_types();
     
     int  wvector_type    (std::vector<int>);
     void increment_or_add(std::vector<int>, int n);
 
     int  get_max_type   (void) { return max_filter_type; }
     int  get_max_ff_type(void) { return max_file_filter_type; }
+    
 };
 
 
@@ -79,6 +77,7 @@ unsigned int countWordsInString(std::string const& str);
 std::vector<int> calc_wvector (voro::voronoicell_base &c);
 std::vector<int> calc_wvector (voro::voronoicell_base &c, bool extended);
 
+bool compareByCount(const SortEntry &a, const SortEntry &b);
 
 
 #endif

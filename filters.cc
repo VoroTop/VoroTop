@@ -148,23 +148,25 @@ void Filter::loadFilter(std::string filename)
 
 
 
+bool compareByCount(const SortEntry &a, const SortEntry &b)
+{
+    if(a.it->second.count == b.it->second.count)
+        return a.it->first < b.it->first;
+    else return a.it->second.count > b.it->second.count;
+}
+
+
+
 void Filter::increment_or_add(std::vector<int> wvector, int count)
 {
     std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
     
     if (it != entries.end()) it->second.count += count;
     else
-        entries.insert({std::move(wvector), FilterEntry(++max_filter_type, count, 1)});
+        entries.insert({std::move(wvector), FilterEntry(0, count, 1)});
 }
 
 
-
-bool compareByCount(const SortEntry &a, const SortEntry &b)
-{
-    if(a.count == b.count)
-        return a.wvector < b.wvector;
-    else return a.count > b.count;
-}
 
 ////////////////////////////////////////////////////
 ////
@@ -180,36 +182,38 @@ void Filter::print_distribution(std::string filename)
     distribution_file.open(distribution_name.c_str());
     
     // OUTPUT INFORMATION ABOUT SOURCE OF DISTRIBUTION
-    distribution_file << "#\tDISTRIBUTION CREATED FROM ";
+                    distribution_file << "#\tDISTRIBUTION CREATED FROM ";
     if(g_switch==1) distribution_file << "PERTURBATIONS OF ";
-    distribution_file << filename;
+                    distribution_file << filename;
     if(g_switch==1) distribution_file << ", USING " << perturbation_samples << " PERTURBATIONS WITH MAGNITUDE " << perturbation_size;
-    distribution_file << '\n';
+                    distribution_file << '\n';
     
-    if(f_switch)
-        distribution_file << "#\tTypes 1 through " << max_file_filter_type << " obtained from filter in file " << filename_filter << '\n';
+    if(f_switch)    distribution_file << "#\tTypes 1 through " << max_file_filter_type << " obtained from filter in file " << filename_filter << '\n';
+    
     if(max_filter_type > max_file_filter_type && (d_switch || df_switch))
     {
-        if(f_switch) distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from other types in data\n";
-        else         distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from types in data\n";
+       if(f_switch) distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from other types in data\n";
+       else         distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from types in data\n";
     }
-    distribution_file << "#\tColumns indicate: type, Weinberg vector, and count\n";
     
+                    distribution_file << "#\tColumns indicate: type, Weinberg vector, and count\n";
+    
+
+    // SORT BY COUNT, THEN BY WVECTOR
     std::vector<SortEntry> sorted_entries;
-    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it) if(it->second.count>0)
-        sorted_entries.push_back(SortEntry(it->first, it->second.type, it->second.count, it->second.source));
+    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it)
+        sorted_entries.push_back(SortEntry(it));
     std::sort(sorted_entries.begin(), sorted_entries.end(), compareByCount);
     
-    // OUTPUT THE DISTRIBUTION
-    int index = 0;
-    for(std::vector<SortEntry>::iterator it = sorted_entries.begin(); it != sorted_entries.end(); ++it) if(it->count>0)
+    // OUTPUT THE SORTED DISTRIBUTION
+    for(std::vector<SortEntry>::iterator it = sorted_entries.begin(); it != sorted_entries.end(); ++it) if(it->it->second.count>0)
     {
-        distribution_file << ++index << '\t';
+        distribution_file << it->it->second.type << '\t';
         distribution_file << '(';
-        for(int i=0; i<it->wvector.size()-1; i++)
-            distribution_file << it->wvector[i] << ',';
-        distribution_file << it->wvector.back() << ')' << '\t';
-        distribution_file << it->count << '\n';
+        for(int i=0; i<it->it->first.size()-1; i++)
+            distribution_file << it->it->first[i] << ',';
+        distribution_file << it->it->first.back() << ')' << '\t';
+        distribution_file << it->it->second.count << '\n';
     }
 }
 
@@ -227,6 +231,28 @@ int Filter::wvector_type(std::vector<int> wvector)
     if (it != entries.end()) return it->second.type;
     else                     return 0;
 }
+
+
+
+////////////////////////////////////////////////////
+////
+////   RELABELS TYPES OBTAINED FROM DATA IN
+////   DECREASING ORDER OF FREQUENCY
+////
+////////////////////////////////////////////////////
+
+void Filter::relabel_data_types(void)
+{
+    std::vector<SortEntry> sorted_entries;
+    
+    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it)
+        sorted_entries.push_back(SortEntry(it));
+    std::sort(sorted_entries.begin(), sorted_entries.end(), compareByCount);
+    
+    for(int c=0; c<sorted_entries.size(); c++) if(sorted_entries[c].it->second.source == 1)
+        sorted_entries[c].it->second.type = ++max_filter_type;
+}
+
 
 
 

@@ -420,6 +420,8 @@ void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Fil
             filter.increment_or_add(calc_wvector(c),1);
         while(vloP.inc());
     }
+
+    filter.relabel_data_types();
 }
 
 

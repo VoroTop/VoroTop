@@ -390,6 +390,8 @@ void calc_distribution(Filter &filter)
         else counter++;
     }
     filter.increment_or_add(data_wvectors[last],counter);
+
+    filter.relabel_data_types();
 }
 
 
