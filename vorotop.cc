@@ -142,10 +142,10 @@ int main(int argc, char *argv[])
     ////
     ////////////////////////////////////////////////////
 
-    Filter filter;
-    if(f_switch)               filter.loadFilter(filename_filter);
+    FilterN filter;
+    if(f_switch) filter.loadFilter(filename_filter);
 
-
+    
     ////////////////////////////////////////////////////
     ////
     ////   PROCESS DATA ACCORDING TO INPUT OPTIONS

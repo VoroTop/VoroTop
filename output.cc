@@ -125,7 +125,6 @@ void create_cfg_file(std::string filename, Filter &filter)
     ////
     ////////////////////////////////////////////////////
     
-    filter.sort_by_wvector();
     for(int c=0; c<number_of_particles; c++)
     {
         double x = xcoord[c];
@@ -154,9 +153,20 @@ void create_cfg_file(std::string filename, Filter &filter)
             z=newz;
         }
         
-        int index = filter.wvector_index(all_wvectors[c]);
-        int dtype = filter.get_entry_type (index);          // DISTRIBUTION TYPE
-        int count = filter.get_entry_count(index);          // DISTRIBUTION COUNT
+        int dtype, count;
+
+        std::map<std::vector<int>,FilterEntry>::iterator it = filter.entries.find(all_wvectors[c]);
+        if (it != filter.entries.end())
+        {
+            dtype = it->second.type;
+            count = it->second.count;
+        }
+        else
+        {
+            dtype = 0;
+            count = 0;
+        }
+        
         int vtype = dtype;                                  // VORONOI TOPOLOGY TYPE
         if(vtype > filter.get_max_ff_type())
             vtype = 0;
@@ -195,9 +205,11 @@ void create_cfg_file(std::string filename, Filter &filter)
 
 void   cluster_analysis(Filter &filter)
 {
-    filter.sort_for_clustering();
     for(int counter=0; counter<number_of_particles; counter++)
-        cluster_index  [counter] = filter.wvector_type(all_wvectors[counter]);
+    {
+        cluster_index[counter] = filter.wvector_type(all_wvectors[counter]);
+        if(cluster_index[counter] > filter.file_filter_types) cluster_index[counter] = 0;
+    }
     
     int total_defect_particles  = 0;
     int total_crystal_particles = 0;
@@ -416,7 +428,6 @@ void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Fil
             filter.increment_or_add(calc_wvector(c),1);
         while(vloP.inc());
     }
-    filter.sort_by_count();
 }
 
 

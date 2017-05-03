@@ -366,23 +366,19 @@ int calc_all_wvectors(voro::container_periodic& con, voro::particle_order& vo, b
 
 ////////////////////////////////////////////////////
 ////
-////   COMPUTES DISTRIBUTION OF TYPES USING W-VECTORS
-////   THAT WERE ALREADY COMPUTED.
+////   ADDS COMPUTED WVECTORS TO FILTER MAP
 ////
 ////////////////////////////////////////////////////
 
 void calc_distribution(Filter &filter)
 {
-    // WVECTORS ARE ALREADY COMPUTED.  WE COPY THEM, SORT THEM,
-    // COMBINE THEM, AND THEN ADD THEM TO THE FILTER.
+    // WVECTORS ARE ALREADY COMPUTED.  COPY THEM, SORT THEM, COMBINE
+    // THEM, AND ADD THEM TO THE FILTER.
     std::vector< std::vector <int> > data_wvectors = all_wvectors;
     sort(data_wvectors.begin(), data_wvectors.end());
 
-    filter.sort_by_wvector();
-
     int last = 0;
     int counter = 1;
-
     for(int c=1; c<number_of_particles; c++)
     {
         if(data_wvectors[c]!=data_wvectors[last])
@@ -394,9 +390,9 @@ void calc_distribution(Filter &filter)
         else counter++;
     }
     filter.increment_or_add(data_wvectors[last],counter);
-
-    filter.sort_dist_by_count();
 }
+
+
 
 
 

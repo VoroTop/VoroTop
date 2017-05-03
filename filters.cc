@@ -83,7 +83,7 @@ void Filter::loadFilter(std::string filename)
         std::cerr << "Failed to open input file " << filename_filter << "\n\n";
         exit(-1);
     }
-
+    
     structure_types.push_back(std::string());   // STRUCTURE TYPES WILL BE INDEXED BY TYPE, BEGINNING FROM 1.
     
     std::string line;
@@ -93,18 +93,18 @@ void Filter::loadFilter(std::string filename)
     while ( getline(filter_file, line) )
     {
         std::istringstream is(line);
-
+        
         line_counter++;
         if(line[0] == '#') continue;    // IGNORE COMMENTED LINES
         else if(line[0] == '*')         // ADD STRUCTURE TYPES
         {
             int index;
             std::string name;
-
+            
             is.ignore();  // IGNORES *
             is >> index;
             is >> name;
-
+            
             if(index != ++max_file_filter_type)
             {
                 std::cout << "Invalid filter provided.  Structure types in filter must \n";
@@ -120,7 +120,7 @@ void Filter::loadFilter(std::string filename)
         {
             int type;
             is >> type;
-
+            
             if(type < 1 || type > max_file_filter_type)
             {
                 std::cout << "Invalid filter provided.  Structure type " << type << " on line " << line_counter << " does\n";
@@ -128,19 +128,17 @@ void Filter::loadFilter(std::string filename)
                 exit(-1);
             }
             
-            FilterEntry new_entry;
-            new_entry.type = type;
-
+            std::vector<int> new_wvector;
             is.ignore(256,'(');
             int next_label;
             while (is >> next_label)
             {
-                new_entry.wvector.push_back(next_label);
+                new_wvector.push_back(next_label);
                 if (is.peek() == ',') is.ignore();
                 if (is.peek() == ')') break;  // IGNORES DATA AFTER FINAL ')'
             }
             
-            entries.push_back(new_entry);
+            entries.insert({std::move(new_wvector), FilterEntry(type)});
         }
     }
     
@@ -150,30 +148,14 @@ void Filter::loadFilter(std::string filename)
 
 
 
-void Filter::increment_or_add(std::vector<int> wvector, int n)
+void Filter::increment_or_add(std::vector<int> wvector, int count)
 {
-    // IMPLEMENTS A BINARY SEARCH
-    int first = 0;
-    int last = size()-1;
-    int middle = (first+last)/2;
+    std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
     
-    while( first <= last )
-    {
-        if ( entries[middle].wvector < wvector )
-            first = middle + 1;
-        else if ( entries[middle].wvector == wvector )
-        {
-            entries[middle].count+=n;
-            break;
-        }
-        else
-            last = middle - 1;
-        
-        middle = (first + last)/2;
-    }
-    
-    if ( first > last )
-        entries.insert(entries.begin()+first, FilterEntry(++max_filter_type,n,wvector));
+    if (it != entries.end())
+        it->second.count += count;
+    else
+        entries.insert({std::move(wvector), FilterEntry(++max_filter_type, count, 1)});
 }
 
 
@@ -208,14 +190,14 @@ void Filter::print_distribution(std::string filename)
     distribution_file << "#\tColumns indicate: type, Weinberg vector, and count\n";
     
     // OUTPUT THE DISTRIBUTION
-    for (std::vector<FilterEntry>::iterator it = entries.begin() ; it != entries.end(); ++it) if(it->count>0)
+    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin() ; it != entries.end(); ++it) if(it->second.count>0)
     {
-        distribution_file << it->type << '\t';
+        distribution_file << it->second.type << '\t';
         distribution_file << '(';
-        for(int i=0; i<it->wvector.size()-1; i++)
-            distribution_file << it->wvector[i] << ',';
-        distribution_file << it->wvector.back() << ')' << '\t';
-        distribution_file << it->count << '\n';
+        for(int i=0; i<it->first.size()-1; i++)
+            distribution_file << it->first[i] << ',';
+        distribution_file << it->first.back() << ')' << '\t';
+        distribution_file << it->second.count << '\n';
     }
 }
 
@@ -229,112 +211,11 @@ void Filter::print_distribution(std::string filename)
 
 int Filter::wvector_type(std::vector<int> wvector)
 {
-    if(wvector.empty()) return -1;
-    
-    // IMPLEMENTS A BINARY SEARCH
-    int first  = 0;
-    int last   = file_filter_types-1;//entries.size()-1;
-    int middle = (first+last)/2;
-    
-    while( first <= last )
-    {
-        if ( entries[middle].wvector < wvector )
-            first = middle + 1;
-        else if ( entries[middle].wvector == wvector )
-        {
-            return entries[middle].type;
-            break;
-        }
-        else
-            last = middle - 1;
-        
-        middle = (first + last)/2;
-    }
-    
-    if ( first > last )
-        return 0;
-    
-    return 0;
+    std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
+    if (it != entries.end()) return it->second.type;
+//        return it->second.type <= file_filter_types ? it->second.type : 0;
+    else return 0;
 }
-
-
-
-////////////////////////////////////////////////////
-////
-////   FINDS FILTER NUMBER ASSOCIATED WITH A CELL
-////
-////////////////////////////////////////////////////
-
-int Filter::wvector_index(std::vector<int> wvector)
-{
-    if(wvector.empty()) return -1;
-    
-    // IMPLEMENTS A BINARY SEARCH
-    int first = 0;
-    int last = entries.size()-1;
-    int middle = (first+last)/2;
-    
-    while( first <= last )
-    {
-        if ( entries[middle].wvector < wvector )
-            first = middle + 1;
-        else if ( entries[middle].wvector == wvector )
-        {
-            return middle;
-            break;
-        }
-        else
-            last = middle - 1;
-        
-        middle = (first + last)/2;
-    }
-    
-    if ( first > last )
-        return -1;
-    
-    return -1;
-}
-
-
-
-void Filter::sort_dist_by_count(void)
-{
-    sort_by_type();
-    
-    sort(entries.begin(), entries.begin()+file_filter_types, compByCount);
-    sort(entries.begin()+file_filter_types,   entries.end(), compByCount);
-    
-    int label = max_file_filter_type;
-    for(int c=file_filter_types; c<entries.size(); c++)
-        entries[c].type = ++label;
-}
-
-
-
-// FOR CLUSTERING, WE NEED TO PLACE ALL TYPES FROM THE FILTER FILE
-void Filter::sort_for_clustering(void)
-{
-    sort_by_type();
-    sort(entries.begin(), entries.begin()+file_filter_types, compByWvector);
-}
-
-
-
-int  Filter::get_entry_type (int n)
-{
-    if(n>=0) return entries[n].type;
-    else     return 0;
-}
-
-
-
-int  Filter::get_entry_count(int n)
-{
-    if(n>=0) return entries[n].count;
-    else     return 0;
-}
-
-
 
 
 

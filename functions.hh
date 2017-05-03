@@ -34,8 +34,6 @@ void calc_gaussian_distribution(voro::container_periodic& con, voro::particle_or
 void create_cfg_file   (std::string filename, Filter& filter);
 void cluster_analysis  (Filter& filter);
 
-void create_cfg_file_with_perturbations(std::string filename, container_periodic& con, particle_order& vo, Filter& filter);
-
 
 #endif
 
