@@ -14,7 +14,7 @@
 ////                                                ////
 ////////////////////////////////////////////////////////
 
-////   File: vorotop.hh
+////   File: variables.hh
 
 
 #ifndef __VOROTOP_H_INCLUDED__
@@ -35,14 +35,14 @@ extern double supercell_edges[3][3];
 extern double cfg_lscale;
 extern double cfg_atomic_mass;
 
+extern bool scaled_coordinates;
+extern bool no_velocity;
+
 extern std::string cfg_chem_symbol;
 
 extern std::vector <double> xcoord;
 extern std::vector <double> ycoord;
 extern std::vector <double> zcoord;
-
-extern bool scaled_coordinates;
-extern bool no_velocity;
 
 extern std::string name_of_data_file;
 extern std::string filename_output;
@@ -54,10 +54,9 @@ extern std::vector<std::vector <int> > all_wvectors;
 extern std::vector<std::vector <int> > neighbors_list;
 extern std::vector<std::vector <double> > particle_data;     // STORE PARTICLE DATA
 
-extern std::vector<int> neighbors_list_c;
+extern std::vector <int> neighbors_list_c;
 extern std::vector <int> cluster_index;
 extern std::vector <int> cluster_sizes;
-
 
 extern int n_x,n_y,n_z;
 

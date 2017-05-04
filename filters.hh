@@ -65,8 +65,6 @@ public:
 };
 
 
-unsigned int countWordsInString(std::string const& str);
-
 std::vector<int> calc_wvector (voro::voronoicell_base &c);
 std::vector<int> calc_wvector (voro::voronoicell_base &c, bool extended);
 

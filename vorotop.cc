@@ -17,19 +17,14 @@
 ////   File: vorotop.cc
 
 
-#include <ctime>
-#include <queue>
 #include <vector>
 #include <cstring>
 #include <fstream>
-#include <sstream>
 #include <iostream>
-#include <libgen.h>
 #include <algorithm>
-#include <sys/stat.h>
 
 #include "filters.hh"
-#include "vorotop.hh"
+#include "variables.hh"
 #include "functions.hh"
 
 
@@ -126,8 +121,8 @@ int main(int argc, char *argv[])
     voro::container_periodic con (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
                                   supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2], n_x,n_y,n_z,8);
     
-    if     (file_type==1) import_dump_file   (data_file, vo, con);
-    else if(file_type==2) import_atomeye_file(data_file, vo, con);
+    if     (file_type==1) import_dump_file   (data_file, con, vo);
+    else if(file_type==2) import_atomeye_file(data_file, con, vo);
     else
     {
         std::cout << "File format not recognized\n";

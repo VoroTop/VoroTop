@@ -23,7 +23,7 @@
 #include <iostream>
 
 #include "filters.hh"
-#include "vorotop.hh"
+#include "variables.hh"
 
 using namespace voro;
 

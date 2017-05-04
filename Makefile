@@ -20,25 +20,25 @@ vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o function
 subsystem:
 	$(MAKE) -C voro++-0.5
 
-vorotop.o : vorotop.cc filters.hh vorotop.hh functions.hh
+vorotop.o : vorotop.cc filters.hh variables.hh functions.hh
 	$(CXX) $(CXXFLAGS) $(LIBS) vorotop.cc
 
-wvectors.o : wvectors.cc filters.hh vorotop.hh
+wvectors.o : wvectors.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) wvectors.cc
 
 variables.o : variables.cc
 	$(CXX) $(CXXFLAGS) $(LIBS) variables.cc
 
-filters.o : filters.cc filters.hh vorotop.hh
+filters.o : filters.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) filters.cc
 
-import.o : import.cc filters.hh vorotop.hh
+import.o : import.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) import.cc
 
-functions.o : functions.cc filters.hh vorotop.hh
+functions.o : functions.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) functions.cc
 
-output.o : output.cc filters.hh vorotop.hh
+output.o : output.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) output.cc
 
 zip :

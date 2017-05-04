@@ -24,7 +24,7 @@
 #include <iostream>
 
 #include "filters.hh"
-#include "vorotop.hh"
+#include "variables.hh"
 
 
 
@@ -261,13 +261,13 @@ int parse_header(std::ifstream& fp)
 ////
 ////////////////////////////////////////////////////
 
-void import_dump_file(std::ifstream& fp, voro::particle_order &vo, voro::container_periodic &con)
+void import_dump_file(std::ifstream& fp, voro::container_periodic &con, voro::particle_order &vo)
 {
-    double x,y,z;
-    
     // STORES ALL PARTICLE DATA TO particle_data[][]
     for(int c=0; c<number_of_particles; c++)
     {
+        double x,y,z;
+
         for(int d=0; d<xindex; d++)
             fp >> particle_data[c][d];
         
@@ -303,30 +303,36 @@ void import_dump_file(std::ifstream& fp, voro::particle_order &vo, voro::contain
 
 
 
-void import_atomeye_file(std::ifstream& fp, voro::particle_order &vo, voro::container_periodic &con)
+void import_atomeye_file(std::ifstream& fp, voro::container_periodic &con, voro::particle_order &vo)
 {
-    double x,y,z;
-    std::string full_line;
-
     for(int c=0; c<number_of_particles; c++)
     {
-        getline(fp, full_line);
+        double x,y,z;
         
-        if(countWordsInString(full_line)==1)                // ATOMIC MASS AND CHEM SYMBOL
+        double atomic_mass_or_x;
+        fp >>  atomic_mass_or_x;
+        
+        std::string chem_symbol_or_y;
+        fp >>       chem_symbol_or_y;
+        
+        if (isalpha(chem_symbol_or_y[0]))
         {
-            cfg_atomic_mass = ::atof(full_line.c_str());
-            fp >> cfg_chem_symbol; getline(fp, full_line);
-            c--;  continue;
+            cfg_atomic_mass = atomic_mass_or_x;
+            cfg_chem_symbol = chem_symbol_or_y;
+            
+            fp >> xcoord[c];
+            fp >> ycoord[c];
         }
-
-        std::stringstream ss(full_line);
-
-        ss >> xcoord[c];
-        ss >> ycoord[c];
-        ss >> zcoord[c];
+        else
+        {
+            xcoord[c] = atomic_mass_or_x;
+            ycoord[c] = std::stod(chem_symbol_or_y);
+        }
+        
+        fp >> zcoord[c];
         
         for(int d=0; d<attribute_labels.size(); d++)
-            ss >> particle_data[c][d];
+            fp >> particle_data[c][d];
         
         x = xcoord[c];
         y = ycoord[c];

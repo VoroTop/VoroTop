@@ -21,13 +21,13 @@
 #define __FUNCTIONS_H_INCLUDED__  
 
 
-int  parse_header       (std::ifstream&);
-void import_dump_file   (std::ifstream&, voro::particle_order &vo, voro::container_periodic &con);
-void import_atomeye_file(std::ifstream&, voro::particle_order &vo, voro::container_periodic &con);
+void help_message       (void);
+void print_variables    (void);
+void parse_arguments    (int argc, char *argv[]);
 
-void help_message   (void);
-void print_variables(void);
-void parse_arguments(int argc, char *argv[]);
+int  parse_header       (std::ifstream&);
+void import_dump_file   (std::ifstream&, voro::container_periodic &con, voro::particle_order &vo);
+void import_atomeye_file(std::ifstream&, voro::container_periodic &con, voro::particle_order &vo);
 
 int  calc_all_wvectors (voro::container_periodic& con, voro::particle_order& vo, bool extended);
 int  print_wvectors    (std::string filename);

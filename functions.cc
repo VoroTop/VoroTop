@@ -26,7 +26,7 @@
 #include <sys/stat.h>
 
 #include "filters.hh"
-#include "vorotop.hh"
+#include "variables.hh"
 
 
 
@@ -126,20 +126,6 @@ void help_message(void) {
          " -p    : Print to screen system variables.                                       \n"
          " -h    : Print this information.                                                 \n"
          "                                                                                 \n";
-}
-
-
-
-////////////////////////////////////////////////////
-////
-////   COUNT WORDS IN A STRING
-////
-////////////////////////////////////////////////////
-
-unsigned int countWordsInString(std::string const& str)
-{
-    std::stringstream stream(str);
-    return std::distance(std::istream_iterator<std::string>(stream), std::istream_iterator<std::string>());
 }
 
 
