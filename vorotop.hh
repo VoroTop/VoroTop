@@ -21,7 +21,6 @@
 #define __VOROTOP_H_INCLUDED__   
 
 
-#include "voro++.hh"
 #include <string>
 
 

@@ -24,18 +24,8 @@
 #include <random>
 
 #include "mtrand.h"
-#include "import.hh"
 #include "filters.hh"
 #include "vorotop.hh"
-
-using namespace voro;
-
-
-
-bool vector_size(const std::vector<int>& a,const std::vector<int>& b)
-{
-    return (a.size() > b.size());
-}
 
 
 
@@ -156,8 +146,8 @@ void create_cfg_file(std::string filename, Filter &filter)
         
         int dtype, count;
 
-        std::map<std::vector<int>,FilterEntry>::iterator it = filter.entries.find(all_wvectors[c]);
-        if (it != filter.entries.end())
+        auto it = filter.find(all_wvectors[c]);
+        if (it != filter.end())
         {
             dtype = it->second.type;
             count = it->second.count;
@@ -196,6 +186,12 @@ void create_cfg_file(std::string filename, Filter &filter)
 
 
 
+bool vector_size(const std::vector<int>& a,const std::vector<int>& b)
+{
+    return (a.size() > b.size());
+}
+
+
 ////////////////////////////////////////////////////
 ////
 ////   MAKE A CFG FILE USING FILTER, AND ALSO CLUSTERING
@@ -209,7 +205,7 @@ void   cluster_analysis(Filter &filter)
     for(int counter=0; counter<number_of_particles; counter++)
     {
         cluster_index[counter] = filter.wvector_type(all_wvectors[counter]);
-        if(cluster_index[counter] > filter.file_filter_types) cluster_index[counter] = 0;
+        if(cluster_index[counter] > filter.get_file_filter_types()) cluster_index[counter] = 0;
     }
     
     int total_defect_particles  = 0;
@@ -377,7 +373,7 @@ void   cluster_analysis(Filter &filter)
 ////
 ////////////////////////////////////////////////////
 
-void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Filter &filter)
+void calc_gaussian_distribution(voro::container_periodic& con, voro::particle_order& vo, Filter &filter)
 {
     std::default_random_engine generator;
     std::normal_distribution<double> distribution(0., perturbation_size);
@@ -385,14 +381,14 @@ void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Fil
     for(int loop = 0; loop < perturbation_samples; loop++)
     {
         // NEW, PERTURBED VERSION OF THE PRIMARY SYSTEM
-        particle_order voP;
-        container_periodic conP (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
-                                 supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2],
-                                 n_x,n_y,n_z,8);
+        voro::particle_order voP;
+        voro::container_periodic conP (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
+                                       supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2],
+                                       n_x,n_y,n_z,8);
         
         int pid;
         double x,y,z;
-        c_loop_order_periodic vlo(con,vo);
+        voro::c_loop_order_periodic vlo(con,vo);
         
         // ADD PERTURBATION OF PARTICLES IN PRIMARY CONTAINER TO PERTURBED CONTAINER
         if(vlo.start()) do
@@ -414,8 +410,8 @@ void calc_gaussian_distribution(container_periodic& con, particle_order& vo, Fil
         
         
         // COMPUTE DISTRIBUTION OF TYPES IN THE PERTURBED VERSION
-        voronoicell c;
-        c_loop_order_periodic vloP(conP,voP);
+        voro::voronoicell c;
+        voro::c_loop_order_periodic vloP(conP,voP);
         if(vloP.start()) do if(conP.compute_cell(c,vloP))
             filter.increment_or_add(calc_wvector(c),1);
         while(vloP.inc());

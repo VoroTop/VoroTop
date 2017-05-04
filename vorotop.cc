@@ -28,7 +28,6 @@
 #include <algorithm>
 #include <sys/stat.h>
 
-#include "import.hh"
 #include "filters.hh"
 #include "vorotop.hh"
 #include "functions.hh"
@@ -123,9 +122,9 @@ int main(int argc, char *argv[])
     ////
     ////////////////////////////////////////////////////
     
-    particle_order vo;
-    container_periodic con (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
-                            supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2], n_x,n_y,n_z,8);
+    voro::particle_order vo;
+    voro::container_periodic con (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
+                                  supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2], n_x,n_y,n_z,8);
     
     if     (file_type==1) import_dump_file   (data_file, vo, con);
     else if(file_type==2) import_atomeye_file(data_file, vo, con);

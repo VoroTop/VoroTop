@@ -17,9 +17,8 @@
 ////   File: variables.cc
 
 
+#include <vector>
 #include <sstream>
-
-#include "voro++.hh"
 
 
 

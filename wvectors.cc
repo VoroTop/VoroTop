@@ -22,7 +22,6 @@
 #include <fstream>
 #include <iostream>
 
-#include "voro++.hh"
 #include "filters.hh"
 #include "vorotop.hh"
 
