@@ -23,11 +23,8 @@
 #include <sstream>
 #include <iostream>
 
-#include "import.hh"
 #include "filters.hh"
 #include "vorotop.hh"
-
-using namespace voro;
 
 
 
@@ -264,7 +261,7 @@ int parse_header(std::ifstream& fp)
 ////
 ////////////////////////////////////////////////////
 
-void import_dump_file(std::ifstream& fp, particle_order &vo, container_periodic &con)
+void import_dump_file(std::ifstream& fp, voro::particle_order &vo, voro::container_periodic &con)
 {
     double x,y,z;
     
@@ -306,7 +303,7 @@ void import_dump_file(std::ifstream& fp, particle_order &vo, container_periodic 
 
 
 
-void import_atomeye_file(std::ifstream& fp, particle_order &vo, container_periodic &con)
+void import_atomeye_file(std::ifstream& fp, voro::particle_order &vo, voro::container_periodic &con)
 {
     double x,y,z;
     std::string full_line;

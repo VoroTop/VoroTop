@@ -38,17 +38,7 @@ struct FilterEntry
 };
 
 
-
-struct SortEntry
-{
-    std::map<std::vector<int>,FilterEntry>::iterator it;
-    SortEntry(std::map<std::vector<int>,FilterEntry>::iterator i) : it(i) {};
-};
-
-
-
 class Filter {
-public:
     std::map<std::vector<int>,FilterEntry> entries;
     std::vector<std::string> structure_types;
     int max_file_filter_type;
@@ -69,6 +59,9 @@ public:
     int  get_max_type   (void) { return max_filter_type; }
     int  get_max_ff_type(void) { return max_file_filter_type; }
     
+    std::map<std::vector<int>,FilterEntry>::iterator find(std::vector<int> w) { return entries.find(w); }
+    std::map<std::vector<int>,FilterEntry>::iterator end (void)               { return entries.end ( ); }
+    int get_file_filter_types() { return file_filter_types; }
 };
 
 
@@ -76,8 +69,6 @@ unsigned int countWordsInString(std::string const& str);
 
 std::vector<int> calc_wvector (voro::voronoicell_base &c);
 std::vector<int> calc_wvector (voro::voronoicell_base &c, bool extended);
-
-bool compareByCount(const SortEntry &a, const SortEntry &b);
 
 
 #endif

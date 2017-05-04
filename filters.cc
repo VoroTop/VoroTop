@@ -37,8 +37,7 @@
 
 // FILTER FILES ARE ORGANIZED AS FOLLOWS:
 //
-//   LINES BEGINNING WITH # ARE IGNORED AND ARE USED FOR
-//   COMMENTS.
+//   LINES BEGINNING WITH # ARE IGNORED AND ARE USED FOR COMMENTS.
 //
 //   LINES BEGINNING WITH * SPECIFICY STRUCTURE TYPES IN THE FITLER.
 //   EACH SUCH LINE, AFTER THE *, INCLUDES AN INTEGER AND THEN A PLAIN-
@@ -148,22 +147,20 @@ void Filter::loadFilter(std::string filename)
 
 
 
-bool compareByCount(const SortEntry &a, const SortEntry &b)
+bool compare_by_count_wvector(std::map<std::vector<int>,FilterEntry>::iterator a, std::map<std::vector<int>,FilterEntry>::iterator b)
 {
-    if(a.it->second.count == b.it->second.count)
-        return a.it->first < b.it->first;
-    else return a.it->second.count > b.it->second.count;
+    if(a->second.count == b->second.count)
+        return a->first < b->first;
+    else return a->second.count > b->second.count;
 }
 
 
 
 void Filter::increment_or_add(std::vector<int> wvector, int count)
 {
-    std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
-    
+    auto it = entries.find(wvector);
     if (it != entries.end()) it->second.count += count;
-    else
-        entries.insert({std::move(wvector), FilterEntry(0, count, 1)});
+    else entries.insert({std::move(wvector), FilterEntry(0, count, 1)});
 }
 
 
@@ -200,20 +197,20 @@ void Filter::print_distribution(std::string filename)
     
 
     // SORT BY COUNT, THEN BY WVECTOR
-    std::vector<SortEntry> sorted_entries;
-    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it)
-        sorted_entries.push_back(SortEntry(it));
-    std::sort(sorted_entries.begin(), sorted_entries.end(), compareByCount);
-    
+    std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
+    for (auto it = entries.begin(); it != entries.end(); ++it)
+        sorted_entries.push_back(it);
+    std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_wvector);
+
     // OUTPUT THE SORTED DISTRIBUTION
-    for(std::vector<SortEntry>::iterator it = sorted_entries.begin(); it != sorted_entries.end(); ++it) if(it->it->second.count>0)
+    for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it) if((*it)->second.count > 0)
     {
-        distribution_file << it->it->second.type << '\t';
+        distribution_file << (*it)->second.type << '\t';
         distribution_file << '(';
-        for(int i=0; i<it->it->first.size()-1; i++)
-            distribution_file << it->it->first[i] << ',';
-        distribution_file << it->it->first.back() << ')' << '\t';
-        distribution_file << it->it->second.count << '\n';
+        for(int i=0; i<(*it)->first.size()-1; i++)
+            distribution_file << (*it)->first[i] << ',';
+        distribution_file << (*it)->first.back() << ')' << '\t';
+        distribution_file << (*it)->second.count << '\n';
     }
 }
 
@@ -243,14 +240,14 @@ int Filter::wvector_type(std::vector<int> wvector)
 
 void Filter::relabel_data_types(void)
 {
-    std::vector<SortEntry> sorted_entries;
+    std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
+    for (auto it = entries.begin(); it != entries.end(); ++it)
+        sorted_entries.push_back(it);
+    std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_wvector);
     
-    for (std::map<std::vector<int>,FilterEntry>::iterator it = entries.begin(); it != entries.end(); ++it)
-        sorted_entries.push_back(SortEntry(it));
-    std::sort(sorted_entries.begin(), sorted_entries.end(), compareByCount);
-    
-    for(int c=0; c<sorted_entries.size(); c++) if(sorted_entries[c].it->second.source == 1)
-        sorted_entries[c].it->second.type = ++max_filter_type;
+    for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it)
+        if((*it)->second.source == 1)
+            (*it)->second.type = ++max_filter_type;
 }
 
 
