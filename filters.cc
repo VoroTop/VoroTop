@@ -224,7 +224,7 @@ void Filter::print_distribution(std::string filename)
 
 int Filter::wvector_type(std::vector<int> wvector)
 {
-    std::map<std::vector<int>,FilterEntry>::iterator it = entries.find(wvector);
+    auto it = entries.find(wvector);
     if (it != entries.end()) return it->second.type;
     else                     return 0;
 }
@@ -241,13 +241,13 @@ int Filter::wvector_type(std::vector<int> wvector)
 void Filter::relabel_data_types(void)
 {
     std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
-    for (auto it = entries.begin(); it != entries.end(); ++it)
+
+    for (auto it = entries.begin(); it != entries.end(); ++it) if(it->second.source == 1)
         sorted_entries.push_back(it);
     std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_wvector);
     
     for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it)
-        if((*it)->second.source == 1)
-            (*it)->second.type = ++max_filter_type;
+        (*it)->second.type = ++max_filter_type;
 }
 
 

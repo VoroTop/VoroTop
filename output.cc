@@ -442,7 +442,7 @@ int print_wvectors(std::string filename)
         
         wvector_file << all_wvectors[c][length+plength-3] << '\t';     // NUMBER OF FACES
         
-        wvector_file << '(';                                            // P VECTOR
+        wvector_file << '(';                                           // P VECTOR
         for(int d=length; d<length+plength-4; d++)
             wvector_file << all_wvectors[c][d] << ',';
         wvector_file << all_wvectors[c][length+plength-4] << ')' << '\t';

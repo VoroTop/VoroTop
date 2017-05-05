@@ -32,11 +32,10 @@ void import_atomeye_file(std::ifstream&, voro::container_periodic &con, voro::pa
 int  calc_all_wvectors (voro::container_periodic& con, voro::particle_order& vo, bool extended);
 int  print_wvectors    (std::string filename);
 
+void cluster_analysis  (Filter& filter);
 void calc_distribution (Filter& filter);
 void calc_gaussian_distribution(voro::container_periodic& con, voro::particle_order& vo, Filter& filter);
-
 void create_cfg_file   (std::string filename, Filter& filter);
-void cluster_analysis  (Filter& filter);
 
 
 #endif
