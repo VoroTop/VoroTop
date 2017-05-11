@@ -23,7 +23,6 @@
 #include <iostream>
 #include <random>
 
-#include "mtrand.h"
 #include "filters.hh"
 #include "variables.hh"
 
