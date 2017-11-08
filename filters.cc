@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 0.3)              *   ////
+////   *             (Version 0.4)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
@@ -17,23 +17,24 @@
 ////   File: filters.cc
 
 
-// A FILTER IS A SPECIFICATION OF TOPOLOGICAL TYPES, RECORDED
-// WITH WEINBERG CODES, ASSOCIATED TO PARTICULAR LOCAL STRUCTURE
-// TYPES.  IF WE KNOW WHICH TOPOLOGICAL TYPES ARE ASSOCIATED WITH
-// A GIVEN BULK CRYSTAL, FOR EXAMPLE, THEN PARTICLES ASSOCIATED
-// TO DEFECTS CAN BE IDENTIFIED AS THOSE WITH OTHER TOPOLOGICAL
-// TYPES.
+// A FILTER IS A SPECIFICATION OF TOPOLOGICAL TYPES ASSOCIATED
+// TO PARTICULAR LOCAL STRUCTURE TYPES.  EACH TOPOLOGICAL TYPE
+// IS RECORDED WITH A WEINBERG CODE.  IF WE KNOW WHICH TOPOLOGICAL
+// TYPES ARE ASSOCIATED WITH A GIVEN BULK CRYSTAL, THEN PARTICLES
+// ASSOCIATED TO DEFECTS CAN BE IDENTIFIED AS THOSE WITH OTHER
+// TOPOLOGICAL TYPES.
 
-// VoroTop ALLOWS A USER TO SPECIFICY A PARTICULAR FILTER TO STUDY
+// VoroTop ALLOWS A USER TO SPECIFY A PARTICULAR FILTER TO STUDY
 // DATA.  FOR EXAMPLE, WHEN STUDYING AN FCC POLYCRYSTAL, ONE MIGHT
 // USE A FILTER SPECIFYING ALL TOPOLOGICAL TYPES ASSOCIATED WITH
-// FINITE-TEMPERATURE FCC AND HCP CRYSTALS.  THIS WILL THEN ALLOW
-// FOR THE IDENTIFICATION OF FCC STRUCTURE (ASSOCIATED WITH THE
-// BULK CRYSTAL), HCP STRUCTURE (E.G., ASSOCIATED WITH DISLOCATIONS,
-// TWIN PLANES, STACKING FAULTS), AND OTHER DEFECTS.
+// FINITE-TEMPERATURE FCC AND HCP CRYSTALS.  THIS WILL ENABLE THE
+// IDENTIFICATION OF FCC STRUCTURE ASSOCIATED WITH THE BULK
+// AND HCP STRUCTURE ASSOCIATED WITH DISLOCATIONS, TWIN PLANES,
+// AND STACKING FAULTS.
 
-// FILTER FILES FOR SEVERAL COMMON STRUCTURES CAN BE FOUND ONLINE,
-// AT https://www.vorotop.org
+// FILTER FILES FOR COMMON STRUCTURES CAN BE FOUND ONLINE, AT
+//    https://www.vorotop.org
+
 
 // FILTER FILES ARE ORGANIZED AS FOLLOWS:
 //
@@ -46,7 +47,7 @@
 //
 //   REMAINING LINES RECORD WEINBERG CODES AND ASSOCIATED STRUCTURE
 //   TYPES.  EACH LINE BEGINS WITH AN INTEGER AND IS FOLLOWED BY A
-//   SEQUENCE OF INTEGERS (WEINBERG CODE) REPRESENTING A TOPOLOGICAL
+//   SEQUENCE OF INTEGERS (A WEINBERG CODE) REPRESENTING A TOPOLOGICAL
 //   TYPE.  THE FORMAT OF THE WEINBERG CODES IS THAT FOUND IN THE WORK
 //   OF WEINBERG; SEE DOCUMENTATION FOR REFERENCES TO APPROPRIATE WORK.
 
@@ -83,11 +84,14 @@ void Filter::loadFilter(std::string filename)
         exit(-1);
     }
     
-    structure_types.push_back(std::string());   // STRUCTURE TYPES WILL BE INDEXED BY TYPE, BEGINNING FROM 1.
-    
+    structure_types.push_back(std::string());   // STRUCTURE TYPES WILL BE INDEXED BEGINNING FROM 1
+    indeterminate.push_back(0);
+    resolved_types.push_back(std::make_pair(0,0));
+    int indeterminate_counter = 0;              // COUNT TOTAL INDETERMINATE TYPES
+
     std::string line;
     max_file_filter_type = 0;
-    int line_counter = 0;
+    int line_counter     = 0;
     
     while ( getline(filter_file, line) )
     {
@@ -100,10 +104,9 @@ void Filter::loadFilter(std::string filename)
             int index;
             std::string name;
             
-            is.ignore();  // IGNORES *
-            is >> index;
-            is >> name;
-            
+            is.ignore();    // IGNORES *
+
+            is >> index;    // READ STRUCTURE TYPE INDEX
             if(index != ++max_file_filter_type)
             {
                 std::cout << "Invalid filter provided.  Structure types in filter must \n";
@@ -111,11 +114,37 @@ void Filter::loadFilter(std::string filename)
                 exit(-1);
             }
             
+            // READ STRUCTURE TYPE NAME UP TO NEXT TAB
+            is >> std::ws;  // IGNORE WHITESPACE
+            char ch;
+            while((ch=is.get())!='\t' && !is.eof())
+                name += ch;
             structure_types.push_back(name);
+            
+            // IF NUMBERS FOLLOW, THEN THIS STRUCTURE TYPE IS INDETERMINATE, AND
+            // CAN BE RESOLVED USING THE -r OPTION.
+            is >> std::ws;           // IGNORE WHITESPACE
+            if(isdigit(is.peek()))
+            {
+                int resolved_primary   = 0;
+                int resolved_secondary = 0;
+                is >> resolved_primary;
+                is >> resolved_secondary;
+                
+                indeterminate.push_back(1);
+                resolved_types.push_back(std::make_pair(resolved_primary,resolved_secondary));
+                indeterminate_counter++;
+            }
+            else
+            {
+                indeterminate.push_back(0);
+                resolved_types.push_back(std::make_pair(0,0));
+            }
+            
             continue;
         }
         
-        else                            // ADD WEINBERG CODES
+        else                         // READ WEINBERG CODES
         {
             int type;
             is >> type;
@@ -140,6 +169,9 @@ void Filter::loadFilter(std::string filename)
             entries.insert({std::move(new_wvector), FilterEntry(type)});
         }
     }
+
+    if(r_switch && (indeterminate_counter==0))
+        std::cout << "Warning: -r switch chosen, but no indeterminate structure types found in filter\n";
     
     file_filter_types = entries.size();
     max_filter_type   = max_file_filter_type;
@@ -178,30 +210,40 @@ void Filter::print_distribution(std::string filename)
     std::ofstream distribution_file;
     distribution_file.open(distribution_name.c_str());
     
+    double est = 0.;
+    for(auto it = entries.begin(); it != entries.end(); ++it) if(it->second.count > 0)
+    {
+        double pne = double(it->second.count)/number_of_particles;
+        est += pne*pow(1.-pne,number_of_particles);
+    }
+    
+    
     // OUTPUT INFORMATION ABOUT SOURCE OF DISTRIBUTION
-                    distribution_file << "#\tDISTRIBUTION CREATED FROM ";
+    distribution_file << "#\tDISTRIBUTION CREATED FROM ";
     if(g_switch==1) distribution_file << "PERTURBATIONS OF ";
-                    distribution_file << filename;
+    distribution_file << filename;
     if(g_switch==1) distribution_file << ", USING " << perturbation_samples << " PERTURBATIONS WITH MAGNITUDE " << perturbation_size;
-                    distribution_file << '\n';
+    distribution_file << '\n';
+    if(d_switch==1 || g_switch==1)
+        distribution_file << "#\tEstimated fraction covered: " << 1. - est << '\n';
     
     if(f_switch)    distribution_file << "#\tTypes 1 through " << max_file_filter_type << " obtained from filter in file " << filename_filter << '\n';
     
-    if(max_filter_type > max_file_filter_type && (d_switch || df_switch))
+    if((max_filter_type > max_file_filter_type) && d_switch)
     {
-       if(f_switch) distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from other types in data\n";
-       else         distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from types in data\n";
+        if(f_switch) distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from other types in data\n";
+        else         distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from types in data\n";
     }
     
-                    distribution_file << "#\tColumns indicate: type, Weinberg vector, and count\n";
+    distribution_file << "#\tColumns indicate: type, Weinberg vector, and count\n";
     
-
+    
     // SORT BY COUNT, THEN BY WVECTOR
     std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
     for (auto it = entries.begin(); it != entries.end(); ++it)
         sorted_entries.push_back(it);
     std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_wvector);
-
+    
     // OUTPUT THE SORTED DISTRIBUTION
     for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it) if((*it)->second.count > 0)
     {
@@ -241,7 +283,7 @@ int Filter::wvector_type(std::vector<int> wvector)
 void Filter::relabel_data_types(void)
 {
     std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
-
+    
     for (auto it = entries.begin(); it != entries.end(); ++it) if(it->second.source == 1)
         sorted_entries.push_back(it);
     std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_wvector);
@@ -249,7 +291,4 @@ void Filter::relabel_data_types(void)
     for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it)
         (*it)->second.type = ++max_filter_type;
 }
-
-
-
 

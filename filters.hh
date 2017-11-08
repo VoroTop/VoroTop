@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 0.3)              *   ////
+////   *             (Version 0.4)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
@@ -27,6 +27,8 @@
 #include <algorithm>
 
 
+using WeinbergVector = std::vector<int>;
+
 struct FilterEntry
 {
     int type;
@@ -39,8 +41,13 @@ struct FilterEntry
 
 
 class Filter {
-    std::map<std::vector<int>,FilterEntry> entries;
+    std::map<WeinbergVector,FilterEntry> entries;
     std::vector<std::string> structure_types;
+    
+    std::vector<bool>               indeterminate;    // TRACK WHETHER TYPE IS INDETERMINATE
+public:
+    std::vector<std::pair<int,int> > resolved_types;   // PRIMARY AND SECONDARY RESOLVED TYPES
+
     int max_file_filter_type;
     int max_filter_type;
     int file_filter_types;
@@ -53,20 +60,21 @@ public:
     void print_distribution(std::string);
     void relabel_data_types();
     
-    int  wvector_type    (std::vector<int>);
-    void increment_or_add(std::vector<int>, int n);
+    int  wvector_type    (WeinbergVector);
+    void increment_or_add(WeinbergVector, int n);
 
     int  get_max_type   (void) { return max_filter_type; }
     int  get_max_ff_type(void) { return max_file_filter_type; }
     
-    std::map<std::vector<int>,FilterEntry>::iterator find(std::vector<int> w) { return entries.find(w); }
-    std::map<std::vector<int>,FilterEntry>::iterator end (void)               { return entries.end ( ); }
-    int get_file_filter_types() { return file_filter_types; }
+    std::map<WeinbergVector,FilterEntry>::iterator find(WeinbergVector w) { return entries.find(w);   }
+    std::map<WeinbergVector,FilterEntry>::iterator end (void)             { return entries.end ( );   }
+    int get_file_filter_types(void)                                       { return file_filter_types; }
+    bool is_indeterminate(int c)                                          { return indeterminate[c];  }
 };
 
 
-std::vector<int> calc_wvector (voro::voronoicell_base &c);
-std::vector<int> calc_wvector (voro::voronoicell_base &c, bool extended);
+WeinbergVector calc_wvector (voro::voronoicell_base &c);
+WeinbergVector calc_wvector (voro::voronoicell_base &c, bool extended);
 
 
 #endif

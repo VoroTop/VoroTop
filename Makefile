@@ -1,12 +1,23 @@
-# research
-# VoroTop makefile
-#
-# Author : Emanuel A. Lazar (UPenn) 
-# Email  : mLazar@seas.upenn.edu
-# Date   : December 5, 2014
+########################################################
+####                                                ####
+####   ******************************************   ####
+####   *                                        *   ####
+####   *     VoroTop: Voronoi Cell Topology     *   ####
+####   *   Visualization and Analysis Toolkit   *   ####
+####   *             (Version 0.3)              *   ####
+####   *                                        *   ####
+####   *           Emanuel A. Lazar             *   ####
+####   *      University of Pennsylvania        *   ####
+####   *           December 5, 2014             *   ####
+####   *                                        *   ####
+####   ******************************************   ####
+####                                                ####
+########################################################
+
+####   File: Makefile
 
 # C++ compiler
-CXX      = g++ 
+CXX      = g++
 
 # Flags for the C++ compiler
 LFLAGS   = -L./voro++-0.5/src -lvoro++ 
@@ -14,8 +25,8 @@ LIBS     = -I./voro++-0.5/src
 CXXFLAGS = -Wall -O3 -c -std=c++11 
 
 
-vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o output.o 
-	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o output.o $(LFLAGS) -o VoroTop
+vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o analysis.o output.o 
+	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o analysis.o output.o $(LFLAGS) -o VoroTop
 
 subsystem:
 	$(MAKE) -C voro++-0.5
@@ -38,6 +49,9 @@ import.o : import.cc filters.hh variables.hh
 functions.o : functions.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) functions.cc
 
+analysis.o : analysis.cc filters.hh variables.hh
+	$(CXX) $(CXXFLAGS) $(LIBS) analysis.cc
+
 output.o : output.cc filters.hh variables.hh 
 	$(CXX) $(CXXFLAGS) $(LIBS) output.cc
 
@@ -46,4 +60,5 @@ zip :
 
 clean :
 	rm -f *.o voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++
+
 

@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 0.3)              *   ////
+////   *             (Version 0.4)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
@@ -271,6 +271,99 @@ std::vector<int> calc_wvector(voronoicell_base &vcell, bool extended)
     
     return canonical_code;
 }
+
+
+
+////////////////////////////////////////////////////
+////
+////   COMPUTES W-VECTORS FOR ALL PARTICLES;
+////   REPORTS NUMBER THAT ARE "BROKEN".
+////
+////////////////////////////////////////////////////
+
+int calc_all_wvectors(voro::container_periodic& con, voro::particle_order& vo, bool extended)
+{
+    int broken = 0;     // NOTIFY USER IF SOME VORONOI CELLS DON'T COMPUTE
+    
+    // IF NEIGHBOR INFORMATION IS NECESSARY, FOR CLUSTERING
+    if(c_switch)
+    {
+        voro::c_loop_order_periodic vlo(con,vo);
+        voro::voronoicell_neighbor vcell_neighbors;
+        
+        if(vlo.start()) do
+        {
+            if(con.compute_cell(vcell_neighbors,vlo))
+            {
+                int pid = vlo.id[vlo.ijk][vlo.q];
+                vcell_neighbors.neighbors(neighbors_list[pid]);
+                neighbors_list_c[pid] = neighbors_list[pid].size();
+                
+                if(r_switch) volumes[pid] = vcell_neighbors.volume();
+                all_wvectors[pid] = calc_wvector(vcell_neighbors,extended);
+            }
+            else broken++;
+        }
+        while(vlo.inc());
+    }
+    
+    else
+    {
+        voro::c_loop_order_periodic vlo(con,vo);
+        voro::voronoicell vcell;
+        
+        if(vlo.start()) do
+        {
+            if(con.compute_cell(vcell,vlo))
+            {
+                int pid = vlo.id[vlo.ijk][vlo.q];
+                if(r_switch) volumes[pid] = vcell.volume();
+                all_wvectors[pid] = calc_wvector(vcell,extended);
+            }
+            else broken++;
+        }
+        while(vlo.inc());
+    }
+    
+    if(broken>0)
+        std::cout << "Voronoi cells of " << broken << " particles did not compute\n";
+    
+    return broken;      // 0 IF ALL CELLS COMPUTED, POSITIVE OTHERWISE
+}
+
+
+
+////////////////////////////////////////////////////
+////
+////   ADDS COMPUTED WVECTORS TO FILTER MAP
+////
+////////////////////////////////////////////////////
+
+void calc_distribution(Filter &filter)
+{
+    // WVECTORS ARE ALREADY COMPUTED.  COPY THEM, SORT THEM, COMBINE
+    // THEM, AND ADD THEM TO THE FILTER.
+    std::vector< std::vector <int> > data_wvectors = all_wvectors;
+    sort(data_wvectors.begin(), data_wvectors.end());
+    
+    int last = 0;
+    int counter = 1;
+    for(int c=1; c<number_of_particles; c++)
+    {
+        if(data_wvectors[c]!=data_wvectors[last])
+        {
+            filter.increment_or_add(data_wvectors[last],counter);
+            last = c;
+            counter=1;
+        }
+        else counter++;
+    }
+    filter.increment_or_add(data_wvectors[last],counter);
+    
+    filter.relabel_data_types();
+}
+
+
 
 
 

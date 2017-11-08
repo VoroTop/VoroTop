@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 0.3)              *   ////
+////   *             (Version 0.4)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *      University of Pennsylvania        *   ////
@@ -27,6 +27,14 @@
 #include "variables.hh"
 
 
+// TAKEN FROM https://stackoverflow.com/questions/41045236
+// TO FACILITATE IGNORING DATA IN FILE
+template <typename CharT>
+std::basic_istream<CharT>& ignore(std::basic_istream<CharT>& in){
+    std::string ignoredValue;
+    return in >> ignoredValue;
+}
+
 
 ////////////////////////////////////////////////////
 ////
@@ -44,7 +52,7 @@ int parse_header(std::ifstream& fp)
     ////////////////////////////////////////////////////
     
     file_type=0;    // 1 LAMMPS DUMP FORMAT
-                    // 2 AtomEye cfg file ("Extended" format)
+                    // 2 AtomEye "Extended" cfg FORMAT
     
     origin[0]=0.;
     origin[1]=0.;
@@ -53,7 +61,7 @@ int parse_header(std::ifstream& fp)
         for(int d=0; d<3; d++)
             supercell_edges[c][d]=0;
     
-
+    
     ////////////////////////////////////////////////////
     ////
     ////    DETERMINE FILE TYPE
@@ -66,7 +74,7 @@ int parse_header(std::ifstream& fp)
     if (full_line.find("ITEM: TIMESTEP") != std::string::npos)
     {
         file_type = 1;    // LAMMPS DUMP
-        fp >> timestep;   // RECORD timestep
+        header_lines=2;
     }
     
     else if (full_line.find("Number of particles") != std::string::npos)
@@ -74,7 +82,9 @@ int parse_header(std::ifstream& fp)
         file_type = 2;    // ATOMEYE CFG
         std::stringstream s(full_line.substr(21));
         s >> number_of_particles;   // RECORD number_of_particles
-        scaled_coordinates=1;   // ATOMEYE CFG IS ALWAYS SCALED COORDINATES
+        scaled_coordinates=1;       // ATOMEYE CFG IS ALWAYS SCALED COORDINATES
+        
+        header_lines=1;
     }
     
     else
@@ -82,7 +92,7 @@ int parse_header(std::ifstream& fp)
         std::cout << "Unrecognized data file format\n";
         exit(0);
     }
-
+    
     
     ////////////////////////////////////////////////////
     ////
@@ -93,7 +103,6 @@ int parse_header(std::ifstream& fp)
     if(file_type == 1)  // LAMMPS DUMP FILE
     {
         bool done=0;
-        double hi_bound[3];
         
         while(done==0)
         {
@@ -102,7 +111,8 @@ int parse_header(std::ifstream& fp)
             
             if (full_line.find("ITEM: NUMBER OF ATOMS") != std::string::npos)
             {
-                fp >> number_of_particles;
+                fp >> number_of_particles;                
+                header_lines+=2;
             }
             
             else if (full_line.find("ITEM: BOX BOUNDS pp pp pp") != std::string::npos)          // PERIODIC IN ALL THREE DIRECTIONS
@@ -113,17 +123,14 @@ int parse_header(std::ifstream& fp)
                     fp >> hi_bound[c];
                     supercell_edges[c][c] = hi_bound[c]-origin[c];
                 }
+                header_lines+=4;
             }
             
             else if (full_line.find("ITEM: BOX BOUNDS xy xz yz pp pp pp") != std::string::npos) // TRICLINIC CRYSTAL SYSTEM
             {
-                double xlo_bound, xhi_bound, xy;
-                double ylo_bound, yhi_bound, xz;
-                double zlo_bound, zhi_bound, yz;
-                
-                fp >> xlo_bound; fp >> xhi_bound; fp >> xy;
-                fp >> ylo_bound; fp >> yhi_bound; fp >> xz;
-                fp >> zlo_bound; fp >> zhi_bound; fp >> yz;
+                fp >> xlo_bound >> xhi_bound >> xy;
+                fp >> ylo_bound >> yhi_bound >> xz;
+                fp >> zlo_bound >> zhi_bound >> yz;
                 
                 origin  [2] = zlo_bound;
                 hi_bound[2] = zhi_bound;
@@ -140,6 +147,8 @@ int parse_header(std::ifstream& fp)
                 
                 for(int c=0; c<3; c++)
                     supercell_edges[c][c] = hi_bound[c]-origin[c];
+                
+                header_lines+=4;
             }
             
             else if (full_line.find("ITEM: ATOMS ") != std::string::npos)
@@ -153,13 +162,13 @@ int parse_header(std::ifstream& fp)
                     attribute_labels.push_back(entry);
                 
                 xindex=-1;
-                for(int c=0; c<attribute_labels.size(); c++)
+                for(auto c=0; c<attribute_labels.size(); c++)
                 {
                     if(attribute_labels[c]=="x" || attribute_labels[c]=="xs")
                     {
                         if(attribute_labels[c]=="x") scaled_coordinates=0;
                         else                         scaled_coordinates=1;
-
+                        
                         attribute_labels.erase(attribute_labels.begin()+c, attribute_labels.begin()+c+3);
                         xindex=c;
                     }
@@ -171,16 +180,13 @@ int parse_header(std::ifstream& fp)
                     exit(-1);
                 }
                 
+                header_lines+=1;
                 done=1;
             }
         }
-        
-        cfg_lscale = 1.;
-        cfg_atomic_mass = 1.;   // WE SHOULD FIX, TO ALLOW FOR INCLUSION OF MASS
-        cfg_chem_symbol = "X";  // WE SHOULD FIX, TO ALLOW FOR INCLUSION OF ELEMENT
     }
     
-    else if(file_type == 2) // AtomEye "Extended" format
+    else if(file_type == 2) // AtomEye "Extended" FORMAT
     {
         int entries=0;
         bool done  =0;
@@ -203,29 +209,29 @@ int parse_header(std::ifstream& fp)
                 s >> value;
                 
                 supercell_edges[i-1][j-1]=value;
+                header_lines++;
             }
             
             if (full_line.find("A = ") != std::string::npos)
-            {
-                std::stringstream s(full_line.substr(4));
-                s >> cfg_lscale;
-            }
+                header_lines++;
             else if (full_line.find(".NO_VELOCITY.") != std::string::npos)
             {
                 no_velocity = 1;
+                header_lines++;
             }
             else if (full_line.find("entry_count = ") != std::string::npos)
             {
                 std::stringstream s(full_line.substr(14));
-                s >> entries;// cfg_entry_count;
-                done = 1;   // ONCE WE HIT entry_count, WE STOP READING IN auxiliary NAMES
+                s >> entries;
+                done = 1;   // ONCE WE HIT entry_count, STOP READING IN auxiliary NAMES
+                header_lines++;
             }
             else
             {
                 // THERE ARE OTHER LINES THAT WE CURRENTLY IGNORE
             }
         }
-
+        
         if(no_velocity==1) entries -= 3;
         else               entries -= 6;
         
@@ -238,6 +244,7 @@ int parse_header(std::ifstream& fp)
             std::string entry;
             s >> entry;
             attribute_labels.push_back(entry);
+            header_lines++;
         }
     }
     
@@ -263,20 +270,17 @@ int parse_header(std::ifstream& fp)
 
 void import_dump_file(std::ifstream& fp, voro::container_periodic &con, voro::particle_order &vo)
 {
-    // STORES ALL PARTICLE DATA TO particle_data[][]
     for(int c=0; c<number_of_particles; c++)
     {
         double x,y,z;
 
         for(int d=0; d<xindex; d++)
-            fp >> particle_data[c][d];
+            fp >> ignore;
         
-        fp >> xcoord[c]; x = xcoord[c];
-        fp >> ycoord[c]; y = ycoord[c];
-        fp >> zcoord[c]; z = zcoord[c];
+        fp >> x >> y >> z;
         
-        for(int d=xindex+3; d<attribute_labels.size()+3; d++)
-            fp >> particle_data[c][d-3];
+        for(auto d=xindex+3; d<attribute_labels.size()+3; d++)
+            fp >> ignore;
         
         // ADJUST COORDINATES SO SYSTEM UNSCALED AND AT ORIGIN
         if(scaled_coordinates==0)
@@ -316,36 +320,22 @@ void import_atomeye_file(std::ifstream& fp, voro::container_periodic &con, voro:
         fp >>       chem_symbol_or_y;
         
         if (isalpha(chem_symbol_or_y[0]))
-        {
-            cfg_atomic_mass = atomic_mass_or_x;
-            cfg_chem_symbol = chem_symbol_or_y;
-            
-            fp >> xcoord[c];
-            fp >> ycoord[c];
-        }
+            fp >> x >> y;
         else
         {
-            xcoord[c] = atomic_mass_or_x;
-            ycoord[c] = std::stod(chem_symbol_or_y);
+            x = atomic_mass_or_x;
+            y = std::stod(chem_symbol_or_y);
         }
         
-        fp >> zcoord[c];
+        fp >> z;
         
-        for(int d=0; d<attribute_labels.size(); d++)
-            fp >> particle_data[c][d];
-        
-        x = xcoord[c];
-        y = ycoord[c];
-        z = zcoord[c];
-        
-        if(x<0) x+=1.; if(x>1) x-=1.;
-        if(y<0) y+=1.; if(y>1) y-=1.;
-        if(z<0) z+=1.; if(z>1) z-=1.;
+        for(auto d=0; d<attribute_labels.size(); d++)
+            fp >> ignore;
         
         double newx = supercell_edges[0][0]*x + supercell_edges[1][0]*y + supercell_edges[2][0]*z;
         double newy = supercell_edges[0][1]*x + supercell_edges[1][1]*y + supercell_edges[2][1]*z;
         double newz = supercell_edges[0][2]*x + supercell_edges[1][2]*y + supercell_edges[2][2]*z;
-        
+
         con.put(vo,c,newx,newy,newz);
     }
 }
