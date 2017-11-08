@@ -1,4 +1,5 @@
 .gitignore
+LAMMPSTextDumpImporter.cpp
 package.zip
 voro++-0.5/src/voro++
 voro++-0.5/src/libvoro++.a
@@ -7,3 +8,4 @@ VoroTop
 OLD/
 NSF-progress.txt
 *.o
+CFGImporter*
