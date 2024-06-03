@@ -1,9 +1,5 @@
 README
 
-*VoroTop* is a modern set of open-source tools for analyzing structure of spatial point sets in three dimensions, using a complete description of the Voronoi cell topology of each point. The power of this approach results from its coarse-graining of structural data in a natural configuration space, instead of in the image of this space under a continuous mapping, which has notable theoretical restrictions. More information about the method can be found in the two papers:
+*VoroTop* uses the Voro++ library to compute the Voronoi cells and must therefore be installed before *VoroTop*.  Voro++ can be obtained at https://github.com/chr1shr/voro.  For the time being, the dev branch of Voro++ should be used.
 
-Lazar, E.A., Han, J., and Srolovitz, D.J. "A Topological Framework for Local Structure Analysis in Condensed Matter", http://arxiv.org/abs/1508.05937, Proc. Natl. Acad. Sci. 112:E5769 (2015).
-
-Landweber, P.S., Lazar, E.A., Patel, N. "On Fiber Diameters of Continuous Maps", http://arxiv.org/abs/1503.07597, Amer. Math. Monthly 123:392 (2016).
-
-
+Compilation of VoroTop can be performed using the make command in the VoroTop directory.

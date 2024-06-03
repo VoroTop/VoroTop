@@ -4,11 +4,11 @@
 ####   *                                        *   ####
 ####   *     VoroTop: Voronoi Cell Topology     *   ####
 ####   *   Visualization and Analysis Toolkit   *   ####
-####   *             (Version 0.3)              *   ####
+####   *             (Version 1.0)              *   ####
 ####   *                                        *   ####
 ####   *           Emanuel A. Lazar             *   ####
-####   *      University of Pennsylvania        *   ####
-####   *           December 5, 2014             *   ####
+####   *          Bar Ilan University           *   ####
+####   *            September 2022              *   ####
 ####   *                                        *   ####
 ####   ******************************************   ####
 ####                                                ####
@@ -17,48 +17,44 @@
 ####   File: Makefile
 
 # C++ compiler
-CXX      = g++
+CXX      = g++ -std=c++11 -fopenmp
 
 # Flags for the C++ compiler
-LFLAGS   = -L./voro++-0.5/src -lvoro++ 
-LIBS     = -I./voro++-0.5/src
-CXXFLAGS = -Wall -O3 -c -std=c++11 
+LFLAGS   = -lvoro++
+CXXFLAGS = -Wall -O3 -c
 
 
-vorotop : subsystem vorotop.o wvectors.o variables.o filters.o import.o functions.o analysis.o output.o 
-	$(CXX) import.o vorotop.o wvectors.o variables.o filters.o functions.o analysis.o output.o $(LFLAGS) -o VoroTop
-
-subsystem:
-	$(MAKE) -C voro++-0.5
+vorotop : vorotop.o vectors.o variables.o filters.o import.o functions.o analysis.o output.o 
+	$(CXX) import.o vorotop.o vectors.o variables.o filters.o functions.o analysis.o output.o $(LFLAGS) -o VoroTop
 
 vorotop.o : vorotop.cc filters.hh variables.hh functions.hh
-	$(CXX) $(CXXFLAGS) $(LIBS) vorotop.cc
+	$(CXX) $(CXXFLAGS) vorotop.cc
 
-wvectors.o : wvectors.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) $(LIBS) wvectors.cc
+vectors.o : vectors.cc filters.hh variables.hh 
+	$(CXX) $(CXXFLAGS) vectors.cc
 
 variables.o : variables.cc
-	$(CXX) $(CXXFLAGS) $(LIBS) variables.cc
+	$(CXX) $(CXXFLAGS) variables.cc
 
 filters.o : filters.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) $(LIBS) filters.cc
+	$(CXX) $(CXXFLAGS) filters.cc
 
 import.o : import.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) $(LIBS) import.cc
+	$(CXX) $(CXXFLAGS) import.cc
 
 functions.o : functions.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) $(LIBS) functions.cc
+	$(CXX) $(CXXFLAGS) functions.cc
 
 analysis.o : analysis.cc filters.hh variables.hh
-	$(CXX) $(CXXFLAGS) $(LIBS) analysis.cc
+	$(CXX) $(CXXFLAGS) analysis.cc
 
 output.o : output.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) $(LIBS) output.cc
+	$(CXX) $(CXXFLAGS) output.cc
 
 zip :
-	zip -r package.zip *.cc *.hh LICENSE README Makefile voro++-0.5 -x voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++ 
+	zip -r package.zip *.cc *.hh LICENSE README Makefile 
 
 clean :
-	rm -f *.o voro++-0.5/src/*.o voro++-0.5/src/libvoro++.a voro++-0.5/src/voro++
+	rm -f *.o 
 
 

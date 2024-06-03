@@ -4,11 +4,11 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 0.4)              *   ////
+////   *             (Version 1.0)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
-////   *      University of Pennsylvania        *   ////
-////   *           December 5, 2014             *   ////
+////   *          Bar Ilan University           *   ////
+////   *               June 2024                *   ////
 ////   *                                        *   ////
 ////   ******************************************   ////
 ////                                                ////
@@ -17,9 +17,7 @@
 ////   File: functions.cc
 
 
-#include <cstring>
 #include <iostream>
-#include <sys/stat.h>
 
 #include "filters.hh"
 #include "variables.hh"
@@ -38,28 +36,28 @@ void help_message(void) {
     "   *                                          *\n"
     "   *      VoroTop: Voronoi Cell Topology      *\n"
     "   *    Visualization and Analysis Toolkit    *\n"
-    "   *              (Version 0.4)               *\n"
+    "   *              (Version 1.0)               *\n"
     "   *                                          *\n"
     "   *            Emanuel A. Lazar              *\n"
-    "   *       University of Pennsylvania         *\n"
-    "   *            December 5, 2014              *\n"
+    "   *           Bar Ilan University            *\n"
+    "   *                June 2024                 *\n"
     "   *                                          *\n"
     "   ********************************************\n"
     "                                               \n"
     "Syntax: VoroTop <filename> [options]           \n"
     "                                               \n"
-    "         VoroTop reads an input file and computes the complete Voronoi cell      \n"
-    "         topology for each point.  Input formats currently accepted include      \n"
-    "         LAMMPS dump and AtomEye cfg formats.  Output is determined by options.  \n"
+    "         VoroTop reads a LAMMPS dump input file and computes the complete Voronoi\n"
+    "         cell topology for each point.  Output is determined by options.         \n"
     "                                                                                 \n"
     "                                                                                 \n"
     "Available options:                                                               \n"
     "                                                                                 \n"
-    " -f    : Generate a LAMMPS <filename>.dump or AtomEye <filename>.cfg file using  \n"
-    "         a filter provided by the user.                                          \n"
+    " -vt   : Compute topology of each particle, save to <filename>.vectors.          \n"
+    " -d    : Compute distribution of Voronoi topologies, represented as either       \n"
+    "         p-vectors or Weinberg vectors, and save to <filename>.distribution.     \n"
+    " -f    : Generate a LAMMPS <filename>.dump file using a filter provided by user  \n"
     "                                                                                 \n"
-    " -w    : Compute w-vector for each particle, save to file <filename>.wvectors.   \n"
-    " -d    : Compute distribution of w-vectors, save to file <filename>.distribution.\n"
+    " -t    : Specify number of threads to use.                                       \n"
     " -g    : Compute distribution of w-vectors for perturbations of a system. This   \n"
     "         option should be followed by two numbers, one specifying the number of  \n"
     "         samples, the other specifying the size of the random perturbations.     \n"
@@ -72,13 +70,6 @@ void help_message(void) {
     "         assign the constituent particles a unique index.  Similar cluster       \n"
     "         analysis is also performed for types in the filter.  This option        \n"
     "         requires loading a filter file for analysis.                            \n"
-    "                                                                                 \n"
-    " -o    : Specify output file primary name <filename>.  If requested, w-vectors   \n"
-    "         will be saved to <filename>.wvectors; distribution will be saved to     \n"
-    "         <filename>.distribution; AtomEye data will be saved to <filename>.cfg.  \n"
-    " -od   : Specify output directory.  If requested, w-vectors or AtomEye cfg files \n"
-    "         will be saved to specified directory, using current filename; directory \n"
-    "         must previously exist.                                                  \n"
     "                                                                                 \n";
 }
 
@@ -107,33 +98,35 @@ void parse_arguments(int argc, char *argv[])
         exit(-1);
     }
     
-    // DETERMINE INPUT AND OUTPUT FILENAMES
-    name_of_data_file = argv[1];
-    std::size_t found = name_of_data_file.find_last_of("/\\");
-    std::string path  = name_of_data_file.substr(0,found+1);
-    std::string file  = name_of_data_file.substr(found+1);
+    // DETERMINE INPUT AND OUTPUT FILENAMES, FIX, SINCE WE DON'T NEED ALL OF THIS PARSING AND CONTROL
+    filename_data = argv[1];
+    //name_of_data_file = argv[1];
+    //std::size_t found = name_of_data_file.find_last_of("/\\");
+    //std::string path  = name_of_data_file.substr(0,found+1);
+    //std::string file  = name_of_data_file.substr(found+1);
+    
+    
+    // DEFAULT THREADS IF NOT SPECIFIED BY USER
+#ifdef _OPENMP
+    if(omp_get_max_threads()>2) threads = omp_get_max_threads()-2;
+    else                        threads = 1;
+#else
+    threads = 1;
+#endif
+    
+
+    // DEFAULT DIMENSION: 3
+    dimension = 3;
+
+    // FOR EPS COLORING SCHEME
+    particle_coloring_scheme = -1;
     
     // FIRST ARGUMENT (d=1) IS INPUT DATA FILENAME; PARSE REMAINING ARGUMENTS.
     for(int d=2; d<argc; d++)
     {
-        if(strcmp(argv[d],"-f")==0)                        // SPECIFY FILTER FILE
-        {
-            if(argc > d+1 && argv[d+1][0]!='-')
-            {
-                f_switch=1;
-                filename_filter = argv[d+1];
-                d++;
-            }
-            else
-            {
-                help_message();
-                std::cout << "-f option indicated but no filter specified.\n";
-                exit(0);
-            }
-        }
-
-        else if(strcmp(argv[d],"-w") ==0)  w_switch=1;    // PRINT OUT W-VECTORS FOR EACH PARTICLE
-        else if(strcmp(argv[d],"-d") ==0)  d_switch=1;     // PRINT OUT DISTRIBUTION OF W-VECTORS OF SYSTEM
+        if     (strcmp(argv[d],"-2")  ==0) dimension=2;    // PRINT OUT W-VECTORS FOR EACH PARTICLE
+        else if(strcmp(argv[d],"-vt") ==0) vt_switch=1;    // PRINT OUT W-VECTORS FOR EACH PARTICLE
+        else if(strcmp(argv[d],"-d")  ==0)  d_switch=1;    // PRINT OUT DISTRIBUTION OF W-VECTORS OF SYSTEM
 
         // COMPUTE DISTRIBUTION FOR PERTURBATIONS OF A GIVEN SYSTEM
         else if(strcmp(argv[d],"-g")==0)
@@ -174,6 +167,48 @@ void parse_arguments(int argc, char *argv[])
             }
         }
         
+        else if(strcmp(argv[d],"-f")==0)                        // SPECIFY FILTER FILE
+        {
+            if(argc > d+1 && argv[d+1][0]!='-')
+            {
+                f_switch=1;
+                filename_filter = argv[d+1];
+                d++;
+                particle_coloring_scheme = 3;
+            }
+            else
+            {
+                help_message();
+                std::cout << "-f option indicated but no filter specified.\n";
+                exit(0);
+            }
+        }
+
+        else if(strcmp(argv[d],"-u")==0)                   // OUTPUT UNNORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
+        {        
+            // TAKES OPTIONAL ARGUMENT TO DETERMINE MAXIMAL RADIUS.
+            u_switch = 1;
+            if(argc > d+1 && argv[d+1][0]!='-')
+            {
+                max_radius = atoi(argv[d+1]);
+                d++;
+            }
+            else                                           // DEFAULT VALUE max_radius = 20
+                max_radius = 20;
+        }
+
+        else if(strcmp(argv[d],"-v")==0)                   // OUTPUT NORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
+        {                                                  // TAKES OPTIONAL ARGUMENT TO DETERMINE MAXIMAL RADIUS.
+            v_switch = 1;
+            if(argc > d+1 && argv[d+1][0]!='-')
+            {
+                max_radius = atoi(argv[d+1]);
+                d++;
+            }
+            else                                           // DEFAULT VALUE max_radius = 20
+                max_radius = 20;
+        }
+        
         else if(strcmp(argv[d],"-r") ==0)                // RESOLVE INDETERMINATE TYPES
         {
             r_switch=1;
@@ -192,7 +227,6 @@ void parse_arguments(int argc, char *argv[])
             else
                 resolve_trials = 5;
         }
-
         
         else if(strcmp(argv[d],"-c") ==0)                  // CLUSTER ANALYSIS; TAKES OPTIONAL ARGUMENT
         {
@@ -216,46 +250,49 @@ void parse_arguments(int argc, char *argv[])
                 clustering_default_switch = 0;
             }
         }
+       
+        // THIS SHOULD TAKE 0, 1, OR 2 ARGUMENTS.  IF 0, THEN DEFFAULT COLORING.  IF 1, THEN COLOR SCHEME
+        // AND DRAW ENTIRE SYSTEM.  IF 2, THEN COLOR SCHEME AND DRAW THAT NUMBER OF PARTICLES.
         
-        // BY DEFAULT, INPUT FILE IS USED AS A BASENAME FOR OUTPUT FILES.  NEW
-        // BASENAME OR OUTPUT DIRECTORIES CAN BE SPECIFIED.
-        else if(strcmp(argv[d],"-od")==0)                       // SPECIFY OUTPUT DIRECTORY
-        {
-            if(argc > d+1 && argv[d+1][0]!='-')
+        else if(strcmp(argv[d],"-e")==0)                   // OUTPUT EPS FILE; TAKES 0, 1, OR 2 ARGUMENTS.
+        {                                                  // 0 ARGUMENTS: DEFAULT COLOR SCHEME, DRAW ENTIRE SYSTEM
+            e_switch=1;                                    // 1 ARGUMENT : COLOR SCHEME, DRAW ENTIRE SYSTEM
+            if(argc > d+1 && argv[d+1][0]!='-')            // 2 ARGUMENTS: COLOR SCHEME, DRAW GIVEN NUMBER OF PARTICLES
             {
-                path = argv[d+1];                               // WE HAVE CHANGED THE PATH
-                if(path.back()!='\\' && path.back()!='/')
-                    path.append("/");
-                d++;
+                particle_coloring_scheme = atoi(argv[d+1]);         // FIRST OPTIONAL ARGUMENT GIVES COLOR SCHEME
                 
-                // IF SPECIFIED OUTPUT DIRECTORY DOES NOT EXIST, CREATE IT
-                struct stat st;
-                if (stat(path.c_str(), &st) == -1)
-                    mkdir(path.c_str(), 0744);
-            }
-            else
-            {
-                help_message();
-                std::cout << "-od option indicated but no output directory specified.\n";
-                exit(0);
-            }
-        }
-        
-        else if(strcmp(argv[d],"-o")==0)                        // SPECIFY OUTPUT FILE NAME
-        {
-            if(argc > d+1 && argv[d+1][0]!='-')
-            {
-                file = argv[d+1];                               // WE HAVE CHANGED THE FILE NAME
+                if(argc > d+2 && argv[d+2][0]!='-')        // SECOND ARGUMENT, DETERMINES NUMBER OF PARTICLES
+                {
+                    particles_in_eps = atoi(argv[d+2]);
+                    d++;
+                }
+                
                 d++;
             }
-            else
+            else                                           // NO ARGUMENTS
+            {
+                if(particle_coloring_scheme==-1)           // IF COLORING SCHEME WAS SET BY -f SWITCH, THEN DON'T DEFAULT TO 2
+                particle_coloring_scheme  = 2;             // DEFAULT particle_coloring_scheme (2) COLOR BY EDGE COUNT
+                particles_in_eps = 0;                      // DRAW ALL PARTICLES
+            }
+            
+            // CATCH ERROR IN COLOR SCHEME, OUTPUT INSTRUCTIONS
+            if(particle_coloring_scheme<0 || particle_coloring_scheme>4)
             {
                 help_message();
-                std::cout << "-o option indicated but no output file specified.\n\n";
+                std::cout << "Coloring scheme is given as " << particle_coloring_scheme << ", but must be between 0 and 4" << '\n';
                 exit(0);
             }
         }
-        
+        else if(strcmp(argv[d],"-n") ==0)  n_switch=1;     // DO NOT DRAW VORONOI CELLS; ONLY DRAW PARTICLES
+
+        else if(strcmp(argv[d],"-t") ==0)                  // SPECIFIC NUMBER OF THREADS FOR MULTITHREADED VERSION
+        {
+            if(argc > d+1 && argv[d+1][0]!='-')
+                threads = atoi(argv[d+1]);
+            d++;
+        }
+ 
         else
         {
             help_message();
@@ -263,11 +300,9 @@ void parse_arguments(int argc, char *argv[])
             exit(0);
         }
     }
-    
-    
+        
     
     // CHECK COMBINATIONS OF OPTIONS
-    
     if(r_switch && !f_switch)
     {
         std::cout << "-r option requires filter file for resolution analysis\n\n";
@@ -280,15 +315,14 @@ void parse_arguments(int argc, char *argv[])
         exit(0);
     }
     
-    if(w_switch && f_switch)
+    if(vt_switch && f_switch)
     {
         std::cout << "-w option not compatible with other options\n\n";
         exit(0);
     }
     
-    filename_output = path + file;
+    //filename_output = path + file;
 }
-
 
 
 
