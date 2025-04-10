@@ -18,6 +18,7 @@
 
 
 #include <iostream>
+#include <stdexcept>
 
 #include "filters.hh"
 #include "variables.hh"
@@ -52,6 +53,8 @@ void help_message(void) {
     "                                                                                 \n"
     "Available options:                                                               \n"
     "                                                                                 \n"
+    " -2    : Specify that the system is two-dimensional.                             \n"
+    "                                                                                 \n"
     " -vt   : Compute topology of each particle, save to <filename>.vectors.          \n"
     " -d    : Compute distribution of Voronoi topologies, represented as either       \n"
     "         p-vectors or Weinberg vectors, and save to <filename>.distribution.     \n"
@@ -82,40 +85,44 @@ void help_message(void) {
 ////
 ////////////////////////////////////////////////////
 
-void parse_arguments(int argc, char *argv[])
+const int DEFAULT_MAX_RADIUS = 20;
+
+void validate_max_radius(int max_radius) {
+    if (max_radius < 1 || max_radius > 127) {
+        throw std::runtime_error("Invalid max_radius: " + std::to_string(max_radius) + ". It must be between 1 and 127.");
+    }
+}
+
+void parse_command_line_options(int argc, char *argv[])
 {
     if(argc<2)
     {
         help_message();
-        std::cerr << "No input data file specified.\n\n\n";
-        exit(-1);
+        std::cout << "No input data file specified." << '\n';
+        exit(0);
     }
     
     if(argc<3)
     {
         help_message();
-        std::cerr << "No command-line options specified.\n\n\n";
-        exit(-1);
+        std::cout << "No command-line options specified." << '\n';
+        exit(0);
     }
     
-    // DETERMINE INPUT AND OUTPUT FILENAMES, FIX, SINCE WE DON'T NEED ALL OF THIS PARSING AND CONTROL
+    // THE FILENAME OF THE INPUT DATA FILE IS THE FIRST ARGUMENT
     filename_data = argv[1];
-    //name_of_data_file = argv[1];
-    //std::size_t found = name_of_data_file.find_last_of("/\\");
-    //std::string path  = name_of_data_file.substr(0,found+1);
-    //std::string file  = name_of_data_file.substr(found+1);
     
     
     // DEFAULT THREADS IF NOT SPECIFIED BY USER
 #ifdef _OPENMP
-    if(omp_get_max_threads()>2) threads = omp_get_max_threads()-2;
+    if(omp_get_max_threads()>2) threads = omp_get_max_threads()-1;
     else                        threads = 1;
 #else
     threads = 1;
 #endif
     
 
-    // DEFAULT DIMENSION: 3
+    // DEFAULT DIMENSION 3; CAN BE CHANGED TO 2 THROUGH COMMAND-LINE FLAG -2
     dimension = 3;
 
     // FOR EPS COLORING SCHEME
@@ -124,7 +131,7 @@ void parse_arguments(int argc, char *argv[])
     // FIRST ARGUMENT (d=1) IS INPUT DATA FILENAME; PARSE REMAINING ARGUMENTS.
     for(int d=2; d<argc; d++)
     {
-        if     (strcmp(argv[d],"-2")  ==0) dimension=2;    // PRINT OUT W-VECTORS FOR EACH PARTICLE
+        if     (strcmp(argv[d],"-2")  ==0) dimension=2;    // SPECIFY FOR 2-DIMENSIONAL SYSTEMS
         else if(strcmp(argv[d],"-vt") ==0) vt_switch=1;    // PRINT OUT W-VECTORS FOR EACH PARTICLE
         else if(strcmp(argv[d],"-d")  ==0)  d_switch=1;    // PRINT OUT DISTRIBUTION OF W-VECTORS OF SYSTEM
 
@@ -194,7 +201,7 @@ void parse_arguments(int argc, char *argv[])
                 d++;
             }
             else                                           // DEFAULT VALUE max_radius = 20
-                max_radius = 20;
+                max_radius = DEFAULT_MAX_RADIUS;
         }
 
         else if(strcmp(argv[d],"-v")==0)                   // OUTPUT NORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
@@ -206,27 +213,11 @@ void parse_arguments(int argc, char *argv[])
                 d++;
             }
             else                                           // DEFAULT VALUE max_radius = 20
-                max_radius = 20;
+                max_radius = DEFAULT_MAX_RADIUS;
         }
         
         else if(strcmp(argv[d],"-r") ==0)                // RESOLVE INDETERMINATE TYPES
-        {
             r_switch=1;
-            if(argc > d+1 && argv[d+1][0]!='-')
-            {
-                resolve_trials = atoi(argv[d+1]);
-                if(0 <= resolve_trials)
-                    d++;
-                else
-                {
-                    help_message();
-                    std::cout << "-r option indicated; can be followed by optional integer for number of trials.\n";
-                    exit(0);
-                }
-            }
-            else
-                resolve_trials = 5;
-        }
         
         else if(strcmp(argv[d],"-c") ==0)                  // CLUSTER ANALYSIS; TAKES OPTIONAL ARGUMENT
         {
@@ -296,8 +287,7 @@ void parse_arguments(int argc, char *argv[])
         else
         {
             help_message();
-            std::cout << "Unidentified option \'" << argv[d] << "\' included.\n\n";
-            exit(0);
+            throw std::runtime_error("Unidentified option '" + std::string(argv[d]) + "' included.");
         }
     }
         
@@ -305,23 +295,18 @@ void parse_arguments(int argc, char *argv[])
     // CHECK COMBINATIONS OF OPTIONS
     if(r_switch && !f_switch)
     {
-        std::cout << "-r option requires filter file for resolution analysis\n\n";
-        exit(0);
+        throw std::runtime_error("-r option requires filter file for resolution analysis");
     }
     
     if(c_switch && !f_switch)
     {
-        std::cout << "-c option requires filter file for cluster analysis\n\n";
-        exit(0);
+        throw std::runtime_error("-c option requires filter file for cluster analysis");
     }
     
     if(vt_switch && f_switch)
     {
-        std::cout << "-w option not compatible with other options\n\n";
-        exit(0);
+        throw std::runtime_error("-w option not compatible with other options");
     }
-    
-    //filename_output = path + file;
 }
 
 

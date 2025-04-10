@@ -8,53 +8,47 @@
 ####   *                                        *   ####
 ####   *           Emanuel A. Lazar             *   ####
 ####   *          Bar Ilan University           *   ####
-####   *            September 2022              *   ####
+####   *               June 2024                *   ####
 ####   *                                        *   ####
 ####   ******************************************   ####
 ####                                                ####
 ########################################################
 
-####   File: Makefile
+### Compiler Configuration ###
+#CXX      := clang++-mp-19 
+CXX      := g++-mp-13
+CXXSTD   := -std=c++11
+CXXFLAGS := -Wall -Wextra -O3 -fopenmp -MMD -MP
+LDFLAGS  := -fopenmp
+LDLIBS   := -lvoro++
 
-# C++ compiler
-CXX      = g++ -std=c++11 -fopenmp
+### Project Structure ###
+BUILD_DIR := build
+SRC_DIR   := .
+TARGET    := VoroTop
 
-# Flags for the C++ compiler
-LFLAGS   = -lvoro++
-CXXFLAGS = -Wall -O3 -c
+# Source and object files
+SOURCES   := $(wildcard $(SRC_DIR)/*.cc)
+OBJECTS   := $(patsubst $(SRC_DIR)/%.cc,$(BUILD_DIR)/%.o,$(SOURCES))
+DEPS      := $(OBJECTS:.o=.d)
 
+### Targets ###
+.PHONY: all clean zip
 
-vorotop : vorotop.o vectors.o variables.o filters.o import.o functions.o analysis.o output.o 
-	$(CXX) import.o vorotop.o vectors.o variables.o filters.o functions.o analysis.o output.o $(LFLAGS) -o VoroTop
+all: $(TARGET)
 
-vorotop.o : vorotop.cc filters.hh variables.hh functions.hh
-	$(CXX) $(CXXFLAGS) vorotop.cc
+$(TARGET): $(OBJECTS)
+	$(CXX) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-vectors.o : vectors.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) vectors.cc
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cc
+	@mkdir -p $(@D)
+	$(CXX) $(CXXSTD) $(CXXFLAGS) -c $< -o $@
 
-variables.o : variables.cc
-	$(CXX) $(CXXFLAGS) variables.cc
+-include $(DEPS)
 
-filters.o : filters.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) filters.cc
+zip:
+	zip -r package.zip *.cc *.hh LICENSE README Makefile
 
-import.o : import.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) import.cc
-
-functions.o : functions.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) functions.cc
-
-analysis.o : analysis.cc filters.hh variables.hh
-	$(CXX) $(CXXFLAGS) analysis.cc
-
-output.o : output.cc filters.hh variables.hh 
-	$(CXX) $(CXXFLAGS) output.cc
-
-zip :
-	zip -r package.zip *.cc *.hh LICENSE README Makefile 
-
-clean :
-	rm -f *.o 
-
-
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+	

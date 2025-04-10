@@ -23,6 +23,7 @@
 #include <iostream>
 #include <iterator>
 #include <algorithm>
+#include <stdexcept>
 
 #include "filters.hh"
 #include "variables.hh"
@@ -40,25 +41,19 @@
 ////   2) SPECIFICATION OF STRUCTURE TYPES, BEGIN WITH *
 ////   3) FILTER, STRUCTURE TYPES AND WEINBERG CODES
 
-void Filter::load_filter(std::string filename)
+void Filter::load_filter()
 {
     std::ifstream filter_file(filename_filter);
     if(!filter_file.is_open())
     {
-        std::cerr << "Failed to open input file " << filename_filter << "\n\n";
-        exit(-1);
+        throw std::runtime_error("Failed to open input file " + filename_filter);
     }
     
-//    structure_types.push_back(std::string());   // STRUCTURE TYPES WILL BE INDEXED BEGINNING FROM 1
-//    indeterminate.push_back(0);
-//    resolved_types.push_back(std::make_pair(0,0));
-//    int indeterminate_counter = 0;              // COUNT TOTAL INDETERMINATE TYPES
-
     std::string line;
-    max_file_filter_type = 0;
-    int line_counter     = 0;
+    max_filter_type_from_file = 0;
+    int line_counter          = 0;
     
-    while ( getline(filter_file, line) )
+    while (getline(filter_file, line))
     {
         std::istringstream is(line);
         
@@ -66,18 +61,15 @@ void Filter::load_filter(std::string filename)
         if(line[0] == '#') continue;    // IGNORE COMMENTED LINES
         else if(line[0] == '*')         // ADD STRUCTURE TYPES
         {
-            continue;  // FIX
             int index;
             std::string name;
             
             is.ignore();    // IGNORES *
 
             is >> index;    // READ STRUCTURE TYPE INDEX
-            if(index != ++max_file_filter_type)
+            if(index != ++max_filter_type_from_file)
             {
-                std::cout << "Invalid filter provided.  Structure types in filter must \n";
-                std::cout << "be ordered consecutively beginning from 1.\n";
-                exit(-1);
+                throw std::runtime_error("Invalid filter provided. Structure types in filter must be ordered consecutively beginning from 1.");
             }
             
             // READ STRUCTURE TYPE NAME UP TO NEXT TAB
@@ -85,7 +77,6 @@ void Filter::load_filter(std::string filename)
             char ch;
             while((ch=is.get())!='\t' && !is.eof())
                 name += ch;
-//            structure_types.push_back(name);
             
             // IF NUMBERS FOLLOW, THEN THIS STRUCTURE TYPE IS INDETERMINATE, AND
             // CAN BE RESOLVED USING THE -r OPTION.
@@ -96,17 +87,7 @@ void Filter::load_filter(std::string filename)
                 int resolved_secondary = 0;
                 is >> resolved_primary;
                 is >> resolved_secondary;
-                
-//                indeterminate.push_back(1);
-//                resolved_types.push_back(std::make_pair(resolved_primary,resolved_secondary));
-//                indeterminate_counter++;
             }
-            else
-            {
-//                indeterminate.push_back(0);
-//                resolved_types.push_back(std::make_pair(0,0));
-            }
-            
             continue;
         }
         
@@ -115,14 +96,10 @@ void Filter::load_filter(std::string filename)
             int structure_type;
             is >> structure_type;
             
-            /*
-            if(structure_type < 1 || structure_type > max_file_filter_type)
+            if(structure_type < 1 || structure_type > max_filter_type_from_file)
             {
-                std::cout << "Invalid filter provided.  Structure type " << structure_type << " on line " << line_counter << " does\n";
-                std::cout << "not match any of those specified in filter header.\n";
-                exit(-1);
+                throw std::runtime_error("Invalid filter provided. Structure type " + std::to_string(structure_type) + " on line " + std::to_string(line_counter) + " does not match any of those specified in filter header.");
             }
-             */
             
             std::vector<int> new_vector;
             is.ignore(256,'(');
@@ -142,8 +119,6 @@ void Filter::load_filter(std::string filename)
 
     if(r_switch && (count_indeterminate_types()==0))
         std::cout << "Warning: -r switch chosen, but no indeterminate structure types found in filter\n";
-    
-//    max_filter_type   = max_file_filter_type;
 }
 
 
@@ -156,13 +131,12 @@ bool compare_by_count_vector(std::map<std::vector<int>,FilterEntry>::iterator a,
 }
 
 
-void Filter::increment_or_add(std::vector<int> topology_vector, int chirality, int count)
+void Filter::increment_or_add(std::vector<int>& topology_vector, int chirality, int count)
 {
     auto it = entries.find(topology_vector);
     if (it != entries.end()) { it->second.counts[chirality+1] += count; it->second.total += count; }
-    else entries.insert({std::move(topology_vector), FilterEntry(0, chirality, count)});
+    else entries.insert({std::move(topology_vector), FilterEntry(chirality, count)});
 }
-
 
 
 
@@ -175,32 +149,9 @@ void Filter::increment_or_add(std::vector<int> topology_vector, int chirality, i
 int Filter::vt_structure_type(std::vector<int> topology_vector)
 {
     auto it = entries.find(topology_vector);
-    if (it != entries.end()) return it->second.structure_types[0]; // BY DEFAULT RETURN FIRST STRUCTURE TYPE, FIX
+    if (it != entries.end()) return it->second.structure_types[0]; 
     else                     return 0;
 }
-
-
-
-////////////////////////////////////////////////////
-////
-////   RELABELS TYPES OBTAINED FROM DATA IN
-////   DECREASING ORDER OF FREQUENCY
-////
-////////////////////////////////////////////////////
-
-void Filter::relabel_data_types(void)
-{
-    std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
-    
-    for (auto it = entries.begin(); it != entries.end(); ++it) if(it->second.source == 1)
-        sorted_entries.push_back(it);
-    std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_vector);
-    
-    for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it)
-        (*it)->second.structure_types[0] = ++max_filter_type;
-}
-
-
 
 
 
@@ -213,20 +164,14 @@ void Filter::relabel_data_types(void)
 void Filter::print_distribution(std::string filename)
 {
     std::string distribution_name(filename);
-    distribution_name.append(".distribution");
+    distribution_name += ".distribution";
     std::ofstream distribution_file;
     distribution_file.open(distribution_name.c_str());
-    
-    // WE WOULD LIKE TO ESTIMATE THE SUM OF THE PROBABILITIES
-    // OF THE TYPES SAMPLED SO FAR. THIS REQUIRES SOME ANALYSIS.
-    double est = 0.;
-    for(auto it = entries.begin(); it != entries.end(); ++it) if(it->second.counts[0] > 0)
+    if (!distribution_file.is_open())
     {
-        double pne = double(it->second.counts[0])/number_of_particles;
-        est += pne*pow(1.-pne,number_of_particles);
+        throw std::runtime_error("Failed to open distribution file: " + distribution_name);
     }
     
-    // FIX THIS UP
     // OUTPUT INFORMATION ABOUT SOURCE OF DISTRIBUTION
     distribution_file << "#\tDISTRIBUTION CREATED FROM ";
     if(g_switch==1) distribution_file << "PERTURBATIONS OF ";
@@ -234,29 +179,22 @@ void Filter::print_distribution(std::string filename)
     if(g_switch==1) distribution_file << ", USING " << perturbation_samples << " PERTURBATIONS WITH MAGNITUDE " << perturbation_size;
     distribution_file << '\n';
 
-    /*
-    if((max_filter_type > max_file_filter_type) && d_switch)
-    {
-        if(f_switch) distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from other types in data\n";
-        else         distribution_file << "#\tTypes " << max_file_filter_type+1 << " through " << max_filter_type << " obtained from types in data\n";
-    }*/
-    
     distribution_file << "#\tColumns indicate: Voronoi topology vector, total count, left-handed, non-chiral, and right-handed types\n";
     
-    // SORT BY COUNT, THEN BY PVECTOR
+    // SORT BY COUNT, THEN BY VORONOI TOPOLOGY VECTOR
     std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
     for (auto it = entries.begin(); it != entries.end(); ++it)
         sorted_entries.push_back(it);
     std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_vector);
     
     // OUTPUT THE SORTED DISTRIBUTION
-    for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it) //if((*it)->second.chirals[1]==0)
+    for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it) 
     {
-        //distribution_file << (*it)->second.structure_types[0] << '\t';
         distribution_file << '(';
-        for(unsigned int i=0; i<(*it)->first.size()-1; i++)
-            distribution_file << (*it)->first[i] << ',';
-        distribution_file << (*it)->first.back() << ')' << '\t';
+        const auto& topology_vector = (*it)->first;
+        for(auto value = topology_vector.begin(); value != topology_vector.end() - 1; ++value)
+            distribution_file << *value << ',';
+        distribution_file << topology_vector.back() << ')' << '\t';
         distribution_file << (*it)->second.total     << '\t';
         distribution_file << (*it)->second.counts[0] << '\t';
         distribution_file << (*it)->second.counts[1] << '\t';
@@ -275,21 +213,23 @@ int Filter::count_indeterminate_types()
 
 
 // WE WANT TO COPY DATA FROM to_copy FILTER TO THIS FILTER
-void Filter::copy_filter(Filter to_copy)
+void Filter::copy_filter(const Filter& to_copy)
 {
-    for (auto it = to_copy.entries.begin(); it != to_copy.entries.end(); ++it)
+    for (const auto& entry : to_copy.entries)
     {
-        auto it2 = entries.find(it->first);
-        if (it2 != entries.end())
+        auto it2 =  entries.find(entry.first);
+        if  (it2 != entries.end())
         {
-            it2->second.counts[0] += it->second.counts[0];
-            it2->second.counts[1] += it->second.counts[1];
-            it2->second.counts[2] += it->second.counts[2];
-            it2->second.total     += it->second.total;
+            it2->second.counts[0] += entry.second.counts[0];
+            it2->second.counts[1] += entry.second.counts[1];
+            it2->second.counts[2] += entry.second.counts[2];
+            it2->second.total     += entry.second.total;
         }
         else
-            entries.insert({std::move(it->first), FilterEntry(0,it->second.counts[0],it->second.counts[1],it->second.counts[2])});
+        {
+            entries.emplace(entry.first, FilterEntry(entry.second.counts[0], entry.second.counts[1], entry.second.counts[2]));
+        }
     }
-    
 }
+
 

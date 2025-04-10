@@ -16,7 +16,6 @@
 
 ////   File: filters.hh
 
-
 // A FILTER SPECIFICIES TOPOLOGICAL TYPES ASSOCIATED TO PARTICULAR
 // LOCAL STRUCTURE TYPES.  EACH TOPOLOGICAL TYPE IS RECORDED WITH
 // A P-VECTOR IN TWO DIMENSIONS OR A WEINBERG CODE IN THREE.  IF
@@ -51,17 +50,14 @@
 //   OF WEINBERG; SEE DOCUMENTATION FOR REFERENCES TO APPROPRIATE WORK.
 
 
-#ifndef __FILTERS_H_INCLUDED__
-#define __FILTERS_H_INCLUDED__   
-
+#pragma once
 
 #include "voro++.hh"
 #include <map>
 #include <vector>
 #include <algorithm>
 
-
-using TopologyVector = std::vector<int>;
+using VoronoiTopologyVector = std::vector<int>;
 
 // EACH FILTER ENTRY CORRESPONDS TO A TOPOLOGICAL TYPE, GIVEN EITHER BY
 // A P-VECTOR OR A WEINBERG-VECTOR.  WE SAVE ITS ASSOCIATED STRUCTURE
@@ -74,52 +70,54 @@ struct FilterEntry
 
     int total;      // total count, sum of counts[3]
     int counts[3];  // 0 for left-handed, 1 for chiral, and 2 for right-handed
-    int source;     // 0 filter file, 1 data
     
-    FilterEntry(int type)                           : source(0) { counts[0]=0; counts[1]=0; counts[2]=0; structure_types.push_back(type); total=0;};
-    FilterEntry(int type, int chirality, int count) : source(1) { counts[0]=0; counts[1]=0; counts[2]=0; total=count;
+    FilterEntry(int type)                           { counts[0]=0; counts[1]=0; counts[2]=0; structure_types.push_back(type); total=0;};
+    FilterEntry(int chirality, int count)           { counts[0]=0; counts[1]=0; counts[2]=0; total=count;
         counts[chirality+1]=count;
         structure_types.push_back(0);
     };
-    FilterEntry(int type, int left, int non, int right) {
+    FilterEntry(int left_handed, int non_handed, int right_handed) {
+        // Initialize structure_types with 0 to indicate an indeterminate or default structure type.
         structure_types.push_back(0);
-        counts[0]=left;
-        counts[1]=non;
-        counts[2]=right;
-        total=left+non+right;
+        counts[0]= left_handed;
+        counts[1]=  non_handed;
+        counts[2]=right_handed;
+        total=left_handed+non_handed+right_handed;
     }
 };
 
 
 // EACH FILTER IS A LIST OF VORONOI TOPOLOGIES, AND SOME
 class Filter {
-    std::map<TopologyVector,FilterEntry> entries;
+    std::map<VoronoiTopologyVector,FilterEntry> entries;
 
 public:
-    int max_file_filter_type;
-    int max_filter_type;
-    void copy_filter(Filter to_copy);
-    
-public:
-    Filter() : max_file_filter_type(0), max_filter_type(0) {}
-    
-    void load_filter(std::string);               // FILE NAME OF FILTER
-    void print_distribution(std::string);       // PRINT DISTRIBUTION TO FILE
-    void relabel_data_types();                  // FIX: DON'T REMEMBER WHAT THIS IS FOR
-    
-    int  vt_structure_type(TopologyVector);     // RETURNS ASSOCIATED STRUCTURE TYPE
-    void increment_or_add (TopologyVector);     // ADDS VORONOI TOPOLOGY TO FILTER
-    void increment_or_add (TopologyVector, int chirality, int count);
-
-    int  get_max_ff_type(void) { return max_file_filter_type; }
-    
-    std::map<TopologyVector,FilterEntry>::iterator find(TopologyVector w) { return entries.find(w);   }
-    std::map<TopologyVector,FilterEntry>::iterator end (void)             { return entries.end ( );   }
+    int max_filter_type_from_file;
+    void copy_filter(const Filter& to_copy);
     int count_indeterminate_types();
+    
+    Filter() : max_filter_type_from_file(0) {}
+
+    // LOADS A FILTER FROM A FILE
+    // The method takes a string representing the file name of the filter
+    // and loads the filter data into the entries map. 
+    void load_filter();               // FILE NAME OF FILTER
+
+    // Prints the distribution to a file. The parameter specifies the file path where the output will be written.
+    void print_distribution(std::string file_path);       // PRINT DISTRIBUTION TO FILE
+
+    // RETURNS ASSOCIATED STRUCTURE TYPE:
+    // The method returns an integer representing the structure type
+    // associated with the given Voronoi topology vector. If no match
+    // is found, it returns 0 to indicate an indeterminate type.
+    int  vt_structure_type(VoronoiTopologyVector);
+
+    void increment_or_add (VoronoiTopologyVector);     // ADDS VORONOI TOPOLOGY TO FILTER
+    void increment_or_add (VoronoiTopologyVector& topology_vector, int chirality, int count);
+
+    std::map<VoronoiTopologyVector,FilterEntry>::iterator find(VoronoiTopologyVector w) { return entries.find(w);   }
+    std::map<VoronoiTopologyVector,FilterEntry>::iterator end (void)                    { return entries.end ( );   }
 };
-
-#endif
-
 
 
 

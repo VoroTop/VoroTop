@@ -17,6 +17,7 @@
 ////   File: vectors.cc
 
 
+#include <array>
 #include <vector>
 #include <cstring>
 #include <fstream>
@@ -39,16 +40,16 @@ using namespace voro;
 ////
 ////////////////////////////////////////////////////
 
-void count_and_store_neighbors(container_2d& con)
+void count_and_store_neighbors_2d(container_2d& con)
 {
 #pragma omp parallel for num_threads(threads)
-    for(container_2d::iterator cli=con.begin();cli<con.end();cli++)
+    for(auto cli=con.begin();cli<con.end();cli++)
     {
         voronoicell_neighbor_2d c(con);
         if (con.compute_cell(c,cli))
         {
-            int ijk=cli->ijk,q=cli->q;
-            int pid = con.id[ijk][q];
+            const int ijk=cli->ijk,q=cli->q;
+            const int pid = con.id[ijk][q];
             cell_neighbor_count[pid]=c.p;
             c.neighbors(neighbors_list_char[pid]);
         }
@@ -61,16 +62,16 @@ void count_and_store_neighbors(container_2d& con)
 }
 
 
-void count_and_store_neighbors(container_3d& con)
+void count_and_store_neighbors_3d(container_3d& con)
 {
 #pragma omp parallel for num_threads(threads)
-    for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
+    for(auto cli=con.begin();cli<con.end();cli++)
     {
         voronoicell_neighbor_3d c(con);
         if (con.compute_cell(c,cli))
         {
-            int ijk=cli->ijk,q=cli->q;
-            int pid = con.id[ijk][q];
+            const int ijk=cli->ijk,q=cli->q;
+            const int pid = con.id[ijk][q];
             c.neighbors(neighbors_list_char[pid]);
             cell_neighbor_count[pid]=neighbors_list_char[pid].size();
         }
@@ -83,60 +84,45 @@ void count_and_store_neighbors(container_3d& con)
 }
 
 
-void calc_distribution(container_2d& con, Filter &filter)
+void calc_distribution_2d(Filter &filter)
 {
-    Filter local_filter[threads];
+    std::vector<Filter> local_filter(threads);
     
     double xdim = hi_bound[0]-origin[0];
     double ydim = hi_bound[1]-origin[1];
-    
+
 #pragma omp parallel for num_threads(threads)
     for (int pid=0; pid<number_of_particles; pid++)
     {
-        // THIS IS OUR LIST OF NEIGHBORS, IT IS A VECTOR.
-        int p2pvector[50];
-        for(int d=0; d<50; d++) p2pvector[d]=0;
-        int maxp = 0;                               // STORE THE MAX NUMBER OF EDGES AMONG NEIGHBORS
+        unsigned int number_of_neighbors = cell_neighbor_count[pid];
+        std::vector< std::pair <double,int> > unordered_neighbors;
+        unordered_neighbors.reserve(number_of_neighbors);
         
-        unsigned int nneighbors = neighbors_list_char[pid].size();
-        std::vector< std::pair <double,int> > prepvect;
-        prepvect.reserve(nneighbors);
-        
-        for(unsigned int q=0; q<nneighbors; q++)
+        for(unsigned int q=0; q<number_of_neighbors; q++)
         {
-            p2pvector[cell_neighbor_count[neighbors_list_char[pid][q]]]++;
-            if(cell_neighbor_count[neighbors_list_char[pid][q]]>maxp) maxp = cell_neighbor_count[neighbors_list_char[pid][q]];
-            
             double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
             double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
             if(dx >  xdim/2) dx -= xdim;
             if(dx < -xdim/2) dx += xdim;
             if(dy >  ydim/2) dy -= ydim;
             if(dy < -ydim/2) dy += ydim;
-            double theta1 = atan(dy/dx) + 3.14159265359/2.;
-            if(dx<0)            theta1 += 3.14159265359;
+            double theta = std::atan2(dy, dx);
             
             int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
-            prepvect.push_back(std::make_pair(theta1, p_id));
+            unordered_neighbors.emplace_back(theta, p_id);
         }
-        std::sort(prepvect.begin(), prepvect.end());
+        std::sort(unordered_neighbors.begin(), unordered_neighbors.end());
         
-        std::vector< std::vector <int> > numbers1;
-        std::vector< std::vector <int> > numbers2;
-        
-        for(unsigned int c=0; c<nneighbors; c++)
+        std::vector<std::vector<int>> numbers1(number_of_neighbors, std::vector<int>(number_of_neighbors));
+        std::vector<std::vector<int>> numbers2(number_of_neighbors, std::vector<int>(number_of_neighbors));
+
+        for(unsigned int c=0; c<number_of_neighbors; c++)
         {
-            std::vector<int> v;
-            for(unsigned int d=0; d<nneighbors; d++)
-                v.push_back(prepvect[(c+d)%nneighbors].second);
-            numbers1.push_back(v);
-        }
-        for(unsigned int c=0; c<nneighbors; c++)
-        {
-            std::vector<int> v;
-            for(unsigned int d=0; d<nneighbors; d++)
-                v.push_back(prepvect[(c-d+nneighbors)%nneighbors].second);
-            numbers2.push_back(v);
+            for(unsigned int d=0; d<number_of_neighbors; d++)
+            {
+                numbers1[c][d] = unordered_neighbors[(c+d)%number_of_neighbors].second;
+                numbers2[c][d] = unordered_neighbors[(c-d+number_of_neighbors)%number_of_neighbors].second;
+            }
         }
         
         std::sort(numbers1.begin(), numbers1.end());
@@ -150,28 +136,26 @@ void calc_distribution(container_2d& con, Filter &filter)
         if(chirality==-1)
         {
             canonical_code=numbers2[0];
-            canonical_code.insert(canonical_code.begin(), nneighbors);
+            canonical_code.insert(canonical_code.begin(), number_of_neighbors);
         }
         else
         {
             canonical_code=numbers1[0];
-            canonical_code.insert(canonical_code.begin(), nneighbors);
+            canonical_code.insert(canonical_code.begin(), number_of_neighbors);
         }
         
-        int tid=omp_get_thread_num();
+        const int tid=omp_get_thread_num();
         local_filter[tid].increment_or_add(canonical_code,chirality,1);
     }
     
     for(int tid=0; tid<threads; tid++)
-        filter.copy_filter(local_filter[tid]);
-    
-    return;
+        filter.copy_filter(local_filter[tid]);    
 }
 
 
-void calc_distribution(container_3d& con, Filter &filter)
+void calc_distribution_3d(container_3d& con, Filter &filter)
 {
-    Filter local_filter[threads];
+    std::vector<Filter> local_filter(threads);
     
 #pragma omp parallel for num_threads(threads)
     for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
@@ -180,9 +164,9 @@ void calc_distribution(container_3d& con, Filter &filter)
         if (con.compute_cell(vcell,cli))
         {
             std::vector<int> canonical_code;                // CANONICAL CODE WILL BE STORED HERE
-            int chirality = compute_canonical_code(canonical_code, vcell);
+            int chirality = compute_canonical_code_3d(canonical_code, vcell);
             
-            int tid=omp_get_thread_num();
+            const int tid=omp_get_thread_num();
             local_filter[tid].increment_or_add(canonical_code,chirality,1);
         }
     }
@@ -193,178 +177,117 @@ void calc_distribution(container_3d& con, Filter &filter)
 
 
 
-
-
-
-////////////////////////////////////////////////////
-////
-////    CALCULATES THE NUMBER OF SIDES AND THE LIST
-////    OF NEIGHBORS OF EACH PARTICLE. NECESSARY
-////    FOR CALCULATING P-VECTORS AND FOR SOME DRAWING
-////
-////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////
-////
-////    CALCULATES THE P-VECTOR FOR EACH PARTICLE.
-////    REQUIRES PREVIOUSLY CALLING calc_neighbors()
-////
-////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////
-////
-////    SHORTENS EACH P-VECTOR TO NOT INCLUDE THE
-////    SYMMETRY ORDER OR CHIRALITY
-////
-////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////
-////
-////    CALCULATES THE P-VECTOR FOR A SINGLE PARTICLE.
-////    USES INFORMATION COMPUTED IN calc_neighbors(),
-////    WHICH COMPUTES THE NUMBER OF NEIGHBORS OF EACH
-////    PARTICLE, AND A LIST OF THOSE NEIGHBORS.
-////
-////////////////////////////////////////////////////
-
-
-
-
-void  print_topology_vectors2d(std::string filename)
+void  print_topology_vectors_2d(std::string filename)
 {
+    constexpr int MAX_NEIGHBORS = 50;
     std::string vectors_name(filename);
     vectors_name.append(".vectors");
     std::ofstream vector_file(vectors_name.c_str(), std::ofstream::out);
     
     // BUFFER OUTPUT FROM EACH THREAD
-    std::stringstream buf[threads];
-    
+    std::vector<stringstream> buf(threads);
+
     double xdim = hi_bound[0]-origin[0];
     double ydim = hi_bound[1]-origin[1];
     
-    
 #pragma omp parallel for num_threads(threads)
-    for (int pid=0; pid<number_of_particles; pid++) {
+    for (int pid=0; pid<number_of_particles; pid++) 
+    {
+        std::array<int, MAX_NEIGHBORS> p2pvector = {0};
+        int maxp = 0;                               // STORE THE MAX NUMBER OF EDGES AMONG NEIGHBORS
+        
+        unsigned int number_of_neighbors = cell_neighbor_count[pid];
+        std::vector< std::pair <double,int> > unordered_neighbors;
+        unordered_neighbors.reserve(number_of_neighbors);
+        
+        for(unsigned int q=0; q<number_of_neighbors; q++)
         {
-            // THIS IS OUR LIST OF NEIGHBORS, IT IS A VECTOR.
-            int p2pvector[50];
-            for(int d=0; d<50; d++) p2pvector[d]=0;
-            int maxp = 0;                               // STORE THE MAX NUMBER OF EDGES AMONG NEIGHBORS
+            p2pvector[cell_neighbor_count[neighbors_list_char[pid][q]]]++;
+            if(cell_neighbor_count[neighbors_list_char[pid][q]]>maxp) maxp = cell_neighbor_count[neighbors_list_char[pid][q]];
             
-            
-            unsigned int nneighbors = neighbors_list_char[pid].size();
-            std::vector< std::pair <double,int> > prepvect;
-            prepvect.reserve(nneighbors);
-            
-            for(unsigned int q=0; q<nneighbors; q++)
-            {
-                p2pvector[cell_neighbor_count[neighbors_list_char[pid][q]]]++;
-                if(cell_neighbor_count[neighbors_list_char[pid][q]]>maxp) maxp = cell_neighbor_count[neighbors_list_char[pid][q]];
-                
-                double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
-                double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
-                if(dx >  xdim/2) dx -= xdim;
-                if(dx < -xdim/2) dx += xdim;
-                if(dy >  ydim/2) dy -= ydim;
-                if(dy < -ydim/2) dy += ydim;
-                double theta1 = atan(dy/dx) + 3.14159265359/2.;
-                if(dx<0)            theta1 += 3.14159265359;
-                
-                int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
-                prepvect.push_back(std::make_pair(theta1, p_id));
-            }
-            std::sort(prepvect.begin(), prepvect.end());
-            
-            std::vector< std::vector <int> > numbers1;
-            std::vector< std::vector <int> > numbers2;
-            
-            for(unsigned int c=0; c<nneighbors; c++)
-            {
-                std::vector<int> v;
-                for(unsigned int d=0; d<nneighbors; d++)
-                    v.push_back(prepvect[(c+d)%nneighbors].second);
-                numbers1.push_back(v);
-            }
-            for(unsigned int c=0; c<nneighbors; c++)
-            {
-                std::vector<int> v;
-                for(unsigned int d=0; d<nneighbors; d++)
-                    v.push_back(prepvect[(c-d+nneighbors)%nneighbors].second);
-                numbers2.push_back(v);
-            }
-            
-            std::sort(numbers1.begin(), numbers1.end());
-            std::sort(numbers2.begin(), numbers2.end());
-            
-            int                                chirality =  0;
-            if     (numbers1[0] < numbers2[0]) chirality =  1;
-            else if(numbers1[0] > numbers2[0]) chirality = -1;
-            
-            int symmetry_order = 1;
-            for(unsigned int c=0; c<nneighbors; c++)    // FIX. THIS SEEMS WRONG. SHOULD INDEX START AT c=1?
-                if(numbers1[c] == numbers1[0])
-                    symmetry_order = c+1;
-            if(chirality==0) symmetry_order *= 2;
-            
-            
-            int tid=omp_get_thread_num();
-            buf[tid] << particle_ids[pid] << '\t';   // PARTICLE ID
-            buf[tid] << nneighbors        << '\t';   // NUMBER OF EDGES
-            buf[tid] << '(';                         // NUMBER OF NEIGHBORS WITH DIFFERENT NUMBRERS OF EDGES
-            for(int d=3; d<maxp; d++)
-                buf[tid] << p2pvector[d] << ",";
-            buf[tid] << p2pvector[maxp] << ")\t";
-            
-            if(chirality==-1)
-            {
-                buf[tid] << "(";
-                buf[tid] << nneighbors << ",";
-                for(long unsigned int d=0; d<numbers2[0].size()-1; d++)
-                    buf[tid] << numbers2[0][d] << ",";
-                buf[tid] << numbers2[0][numbers2[0].size()-1] << ")\t";
-            }
-            else
-            {
-                buf[tid] << "(";
-                buf[tid] << nneighbors << ",";
-                for(long unsigned int d=0; d<numbers1[0].size()-1; d++)
-                    buf[tid] << numbers1[0][d] << ",";
-                buf[tid] << numbers1[0][numbers1[0].size()-1] << ")\t";
-            }
-            buf[tid] << symmetry_order << '\t';
-            buf[tid] << chirality << '\n';
-            
-            //std::vector<std::pair>::iterator it = vector.begin();
-            //prepvect
+            double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
+            double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
+            if(dx >  xdim/2) dx -= xdim;
+            if(dx < -xdim/2) dx += xdim;
+            if(dy >  ydim/2) dy -= ydim;
+            if(dy < -ydim/2) dy += ydim;
+            double theta = std::atan2(dy, dx);
+
+            int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
+            unordered_neighbors.emplace_back(theta, p_id);
         }
+        std::sort(unordered_neighbors.begin(), unordered_neighbors.end());
+        
+        std::vector<std::vector<int>> numbers1(number_of_neighbors, std::vector<int>(number_of_neighbors));
+        std::vector<std::vector<int>> numbers2(number_of_neighbors, std::vector<int>(number_of_neighbors));
+
+        for(unsigned int c=0; c<number_of_neighbors; c++)
+        {
+            for(unsigned int d=0; d<number_of_neighbors; d++)
+            {
+                numbers1[c][d] = unordered_neighbors[(c+d)%number_of_neighbors].second;
+                numbers2[c][d] = unordered_neighbors[(c-d+number_of_neighbors)%number_of_neighbors].second;
+            }
+        }
+        
+        std::sort(numbers1.begin(), numbers1.end());
+        std::sort(numbers2.begin(), numbers2.end());
+
+        int                                chirality =  0;
+        if     (numbers1[0] < numbers2[0]) chirality =  1;
+        else if(numbers1[0] > numbers2[0]) chirality = -1;
+        
+        int symmetry_order = 1;
+        for(unsigned int c=1; c<number_of_neighbors; c++)
+            if(numbers1[c] == numbers1[0])
+                symmetry_order++;
+        if(chirality==0) symmetry_order *= 2;
+
+        const int tid=omp_get_thread_num();
+        buf[tid] << particle_ids[pid] << '\t';   // PARTICLE ID
+        buf[tid] << number_of_neighbors        << '\t';   // NUMBER OF EDGES
+        buf[tid] << '(';                         // NUMBER OF NEIGHBORS WITH DIFFERENT NUMBRERS OF EDGES
+        for(int d=3; d<maxp; d++)
+            buf[tid] << p2pvector[d] << ",";
+        buf[tid] << p2pvector[maxp] << ")\t";
+        
+        if(chirality==-1)
+        {
+            buf[tid] << "(";
+            buf[tid] << number_of_neighbors << ",";
+            for(long unsigned int d=0; d<numbers2[0].size()-1; d++)
+                buf[tid] << numbers2[0][d] << ",";
+            buf[tid] << numbers2[0][numbers2[0].size()-1] << ")\t";
+        }
+        else
+        {
+            buf[tid] << "(";
+            buf[tid] << number_of_neighbors << ",";
+            for(long unsigned int d=0; d<numbers1[0].size()-1; d++)
+                buf[tid] << numbers1[0][d] << ",";
+            buf[tid] << numbers1[0][numbers1[0].size()-1] << ")\t";
+        }
+        buf[tid] << symmetry_order << '\t';
+        buf[tid] << chirality << '\n';
     }
     
     // OUTPUT ALL DATA TO FILE
     for(int t=0; t<threads; t++)
         vector_file << buf[t].rdbuf();
     
-    //    std::cout << "Here\n";
-    //    while(1==1);
-    
-    
     vector_file.close();
-    return;      // 0 IF ALL CELLS COMPUTED, POSITIVE OTHERWISE
 }
 
 
 
 
-int  print_topology_vectors(container_3d& con, std::string filename)
+void print_topology_vectors_3d(container_3d& con, std::string filename)
 {
     std::string vectors_name(filename);
     vectors_name.append(".vectors");
     std::ofstream vector_file(vectors_name.c_str(), std::ofstream::out);
-    
-    int counter[threads]; for(int c=0; c<threads; c++) counter[threads]=0;
-    std::stringstream buf[threads];
+
+    std::vector<stringstream> buf(threads);
     
 #pragma omp parallel for num_threads(threads)
     for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
@@ -582,9 +505,8 @@ int  print_topology_vectors(container_3d& con, std::string filename)
             }
             
             
-            int tid=omp_get_thread_num();
-            counter[tid]++;
-            
+            const int tid=omp_get_thread_num();
+
             buf[tid] << particle_ids[pid] << '\t';     // PARTICLE ID
             buf[tid] << face_count        << '\t';     // NUMBER OF FACES
             buf[tid] << '(';                           // P VECTOR
@@ -609,11 +531,10 @@ int  print_topology_vectors(container_3d& con, std::string filename)
         vector_file << buf[t].rdbuf();
     
     vector_file.close();
-    return 0;
 }
 
 
-int compute_canonical_code(vector<int>& canonical_code, voro::voronoicell_3d& vcell)
+int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d& vcell)
 {
     const int max_epf = 256;    // MAXIMUM EDGES PER FACE
     const int max_epc = 512;    // MAXIMUM EDGES PER CELL
@@ -825,7 +746,7 @@ int compute_canonical_code(vector<int>& canonical_code, voro::voronoicell_3d& vc
 }
 
 
-int classify_particles_by_voronoi_topology(container_3d& con, Filter &filter)
+int classify_particles_by_voronoi_topology_3d(container_3d& con, Filter &filter)
 {
 #pragma omp parallel for num_threads(threads)
     for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
@@ -833,11 +754,11 @@ int classify_particles_by_voronoi_topology(container_3d& con, Filter &filter)
         voronoicell_3d vcell;
         if (con.compute_cell(vcell,cli))
         {
-            int ijk=cli->ijk,q=cli->q;
-            int pid = con.id[ijk][q];
+            const int ijk=cli->ijk,q=cli->q;
+            const int pid = con.id[ijk][q];
             
             std::vector<int> canonical_code;                // CANONICAL CODE WILL BE STORED HERE
-            compute_canonical_code(canonical_code, vcell);
+            compute_canonical_code_3d(canonical_code, vcell);
             
             vt_structure_types[pid] = filter.vt_structure_type(canonical_code);
         }
@@ -847,9 +768,7 @@ int classify_particles_by_voronoi_topology(container_3d& con, Filter &filter)
 }
 
 
-// FIX: WE DON'T CARE ABOUT CHIRALITY, SYMMETRY, ETC, SO NEED TO
-// MAKE AND SORT ONLY ONE LIST OF NUMBERS INSTEAD OF TWO
-void classify_particles_by_voronoi_topology(Filter &filter)
+void classify_particles_by_voronoi_topology_2d(Filter &filter)
 {
     double xdim = hi_bound[0]-origin[0];
     double ydim = hi_bound[1]-origin[1];
@@ -857,73 +776,39 @@ void classify_particles_by_voronoi_topology(Filter &filter)
 #pragma omp parallel for num_threads(threads)
     for (int pid=0; pid<number_of_particles; pid++)
     {
-        // THIS IS OUR LIST OF NEIGHBORS, IT IS A VECTOR.
-        int p2pvector[50];
-        for(int d=0; d<50; d++) p2pvector[d]=0;
-        int maxp = 0;                               // STORE THE MAX NUMBER OF EDGES AMONG NEIGHBORS
+        unsigned int number_of_neighbors = cell_neighbor_count[pid];
+        std::vector< std::pair <double,int> > unordered_neighbors;
+        unordered_neighbors.reserve(number_of_neighbors);
         
-        unsigned int nneighbors = neighbors_list_char[pid].size();
-        std::vector< std::pair <double,int> > prepvect;
-        prepvect.reserve(nneighbors);
-        
-        for(unsigned int q=0; q<nneighbors; q++)
+        for(unsigned int q=0; q<number_of_neighbors; q++)
         {
-            p2pvector[cell_neighbor_count[neighbors_list_char[pid][q]]]++;
-            if(cell_neighbor_count[neighbors_list_char[pid][q]]>maxp) maxp = cell_neighbor_count[neighbors_list_char[pid][q]];
-            
             double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
             double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
             if(dx >  xdim/2) dx -= xdim;
             if(dx < -xdim/2) dx += xdim;
             if(dy >  ydim/2) dy -= ydim;
             if(dy < -ydim/2) dy += ydim;
-            double theta1 = atan(dy/dx) + 3.14159265359/2.;
-            if(dx<0)            theta1 += 3.14159265359;
-            
+            double theta = std::atan2(dy, dx);
+
             int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
-            prepvect.push_back(std::make_pair(theta1, p_id));
+            unordered_neighbors.emplace_back(theta, p_id);
         }
-        std::sort(prepvect.begin(), prepvect.end());
+        std::sort(unordered_neighbors.begin(), unordered_neighbors.end());
         
-        std::vector< std::vector <int> > numbers1;
-        std::vector< std::vector <int> > numbers2;
-        
-        for(unsigned int c=0; c<nneighbors; c++)
+        // CONSTRUCT THE NON-CANONICAL CODES
+        std::vector<std::vector<int>> non_canonical_codes(2*number_of_neighbors, std::vector<int>(number_of_neighbors));
+        for(unsigned int c=0; c<number_of_neighbors; c++)
         {
-            std::vector<int> v;
-            for(unsigned int d=0; d<nneighbors; d++)
-                v.push_back(prepvect[(c+d)%nneighbors].second);
-            numbers1.push_back(v);
-        }
-        for(unsigned int c=0; c<nneighbors; c++)
-        {
-            std::vector<int> v;
-            for(unsigned int d=0; d<nneighbors; d++)
-                v.push_back(prepvect[(c-d+nneighbors)%nneighbors].second);
-            numbers2.push_back(v);
-        }
-        
-        std::sort(numbers1.begin(), numbers1.end());
-        std::sort(numbers2.begin(), numbers2.end());
-        
-        int                                chirality =  0;
-        if     (numbers1[0] < numbers2[0]) chirality =  1;
-        else if(numbers1[0] > numbers2[0]) chirality = -1;
-        
-        std::vector<int> canonical_code;  // CANONICAL CODE WILL BE STORED HERE
-        if(chirality==-1)
-        {
-            canonical_code=numbers2[0];
-            canonical_code.insert(canonical_code.begin(), nneighbors);
-        }
-        else
-        {
-            canonical_code=numbers1[0];
-            canonical_code.insert(canonical_code.begin(), nneighbors);
-        }
-        vt_structure_types[pid] = filter.vt_structure_type(canonical_code);
+            for(unsigned int d=0; d<number_of_neighbors; d++)
+            {
+                non_canonical_codes[c][d] = unordered_neighbors[(c+d)%number_of_neighbors].second;
+                non_canonical_codes[c+number_of_neighbors][d] = unordered_neighbors[(c-d+number_of_neighbors)%number_of_neighbors].second;
+            }
+        }        
+
+        std::sort(non_canonical_codes.begin(), non_canonical_codes.end());
+        non_canonical_codes[0].insert(non_canonical_codes[0].begin(), number_of_neighbors);
+        vt_structure_types[pid] = filter.vt_structure_type(non_canonical_codes[0]);
     }
-    
-    return;
 }
 

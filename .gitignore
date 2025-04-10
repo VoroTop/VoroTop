@@ -1,11 +1,3 @@
-.gitignore
-LAMMPSTextDumpImporter.cpp
-package.zip
-voro++-0.5/src/voro++
-voro++-0.5/src/libvoro++.a
 VoroTop
-.DS_Store
-OLD/
-NSF-progress.txt
-*.o
-CFGImporter*
+build/
+

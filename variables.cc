@@ -52,10 +52,10 @@ int max_radius;
 int particle_coloring_scheme;
 int particles_in_eps;
 int perturbation_samples;
-int resolve_trials;
 
 int header_lines;
 int particle_attributes;
+
 int index_id;
 int index_x;
 int index_y;
@@ -67,9 +67,6 @@ std::ifstream data_file;
 
 int*    particle_ids;
 double* particle_coordinates;
-
-std::vector<double> areas;
-std::vector<double> volumes;
 
 std::vector<int> cluster_index;
 std::vector<int> cluster_sizes;

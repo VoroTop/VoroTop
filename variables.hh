@@ -17,10 +17,7 @@
 ////   File: variables.hh
 
 
-#ifndef __VOROTOP_H_INCLUDED__
-#define __VOROTOP_H_INCLUDED__   
-
-
+#pragma once
 #include <string>
 
 extern int  dimension;    // DIMENSION OF SYSTEM, 2 OR 3
@@ -55,10 +52,10 @@ extern int max_radius;
 extern int particle_coloring_scheme;
 extern int particles_in_eps;
 extern int perturbation_samples;
-extern int resolve_trials;
 
 extern int header_lines;
 extern int particle_attributes;
+
 extern int index_id;
 extern int index_x;
 extern int index_y;
@@ -71,9 +68,6 @@ extern std::ifstream data_file;
 extern int*    particle_ids;
 extern double* particle_coordinates;
 
-extern std::vector<double> areas;
-extern std::vector<double> volumes;
-
 extern std::vector<int> cluster_index;
 extern std::vector<int> cluster_sizes;
 extern std::vector<int> ring_index;
@@ -83,7 +77,5 @@ extern std::vector<std::vector <int> > neighbors_list_char;
 
 extern std::vector<int> vt_structure_types;
 extern std::vector<int> vt_structure_types_resolved;
-
-#endif
 
 

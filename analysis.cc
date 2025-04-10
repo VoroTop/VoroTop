@@ -44,7 +44,7 @@ bool vector_size(const std::vector<int>& a,const std::vector<int>& b)
 ////
 ////////////////////////////////////////////////////
 
-void cluster_analysis(Filter &filter)
+void cluster_analysis2()
 {
     int total_defect_particles  = 0;
     int total_crystal_particles = 0;
@@ -185,16 +185,17 @@ void cluster_analysis(Filter &filter)
     ////   OUTPUT BASIC ANALYSIS OF CLUSTERING DATA TO SCREEN
     ////
     ////////////////////////////////////////////////////
-    /*
+    
     int max_cluster_size = 100;
     std::vector<int> c_sizes(max_cluster_size,0);
     double sum_of_squares = 0;
     
-    for(int c=0; c<clusters_bad.size(); c++)
+    for(unsigned int c=0; c<clusters_bad.size(); c++)
     {
-        if(clusters_bad[c].size()<max_cluster_size)
-            c_sizes[clusters_bad[c].size()]++;
-        sum_of_squares += clusters_bad[c].size()*clusters_bad[c].size();
+        int cluster_size = clusters_bad[c].size();
+        if(cluster_size < max_cluster_size)
+            c_sizes[cluster_size]++;
+        sum_of_squares += cluster_size * cluster_size;
     }
     
     std::cout << filename_data          << '\t';
@@ -220,34 +221,28 @@ void cluster_analysis(Filter &filter)
         std::cout << c_sizes[c] << '\t';
     
     std::cout << '\n';
-    */
 }
 
 
 
 ////////////////////////////////////////////////////
 ////
-////   COMPUTES DISTRIBUTION OF TYPES IN SYSTEM
-////   AFTER RANDOM GAUSSIAN PERTURBATIONS.
-////   COMPUTES perturbation_samples RANDOM
-////   PERTURBATIONS OF SYSTEM, EACH OF STANDARD
-////   DEVIATION perturbation_size, AND SUMS THE
-////   DISTRIBUTION OVER ALL SYSTEMS.  THIS CAN
-////   BE USEFUL IN COMPUTING TYPES ASSOCIATED TO
+////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS 
+////   OF A GIVEN 2D SYSTEM.  USEFUL FOR ANALYZING 
 ////   REALISTIC VERSIONS OF IDEAL SYSTEMS.
 ////
 ////////////////////////////////////////////////////
 
-void calc_gaussian_distribution(Filter &filter)
+void calc_gaussian_distribution_2d(Filter &filter)
 {
-    std::default_random_engine generator;
+    std::mt19937 generator(std::random_device{}());
     std::normal_distribution<double> distribution(0., perturbation_size);
     
+    // NEW, PERTURBED VERSION OF THE ORIGINAL SYSTEM
+    voro::container_2d con2d_perturbed (origin[0],hi_bound[0],origin[1],hi_bound[1],n_x,n_y,true,true,4,threads);
+        
     for(int loop = 0; loop < perturbation_samples; loop++)
     {
-        // NEW, PERTURBED VERSION OF THE ORIGINAL SYSTEM
-        voro::container_2d con2d_perturbed (origin[0],hi_bound[0],origin[1],hi_bound[1],n_x,n_y,true,true,4,threads);
-        
         for(int c=0; c<number_of_particles; c++)
         {
             double x = particle_coordinates[2*c]   + distribution(generator);
@@ -255,189 +250,68 @@ void calc_gaussian_distribution(Filter &filter)
             con2d_perturbed.put(c,x,y);
         }
         
-        count_and_store_neighbors(con2d_perturbed);
-        calc_distribution(con2d_perturbed, filter);
+        count_and_store_neighbors_2d(con2d_perturbed);
+        calc_distribution_2d(filter);
+        con2d_perturbed.clear();
     }
 }
 
 
 ////////////////////////////////////////////////////
 ////
-////   COMPUTES DISTRIBUTION OF TYPES IN SYSTEM
-////   AFTER RANDOM GAUSSIAN PERTURBATIONS.
-////   COMPUTES perturbation_samples RANDOM
-////   PERTURBATIONS OF SYSTEM, EACH OF STANDARD
-////   DEVIATION perturbation_size, AND SUMS THE
-////   DISTRIBUTION OVER ALL SYSTEMS.  THIS CAN
-////   BE USEFUL IN COMPUTING TYPES ASSOCIATED TO
+////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS 
+////   OF A GIVEN 3D SYSTEM.  USEFUL FOR ANALYZING 
 ////   REALISTIC VERSIONS OF IDEAL SYSTEMS.
 ////
 ////////////////////////////////////////////////////
-/*
-void calc_gaussian_distribution3d2(container_3d& con, Filter &filter)
-{
-    
-    std::default_random_engine generator;
+
+void calc_gaussian_distribution_3d(Filter &filter) {
+    std::mt19937 generator(std::random_device{}());  // Seed with truly random seed
     std::normal_distribution<double> distribution(0., perturbation_size);
 
-    for(int loop = 0; loop < perturbation_samples; loop++)
-    {
-        Filter local_filter[threads];
-        
-#pragma omp parallel for num_threads(threads)
-        for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
-        {
-            voronoicell_3d vcell;
-            if (con.compute_cell(vcell,cli))
-            {
-                std::vector<int> canonical_code;                // CANONICAL CODE WILL BE STORED HERE
-                int chirality = compute_canonical_code(canonical_code, vcell);
-                
-                int tid=omp_get_thread_num();
-                local_filter[tid].increment_or_add(canonical_code,chirality,1);
-            }
-        }
-        
-        for(int tid=0; tid<threads; tid++)
-            filter.copy_filter(local_filter[tid]);
-    }
-    
-}*/
+    // Create a container for perturbed particles
+    voro::container_3d con3d_perturbed(supercell_edges[0][0], supercell_edges[1][0], supercell_edges[1][1],
+                                       supercell_edges[2][0], supercell_edges[2][1], supercell_edges[2][2],
+                                       n_x, n_y, n_z, true, true, true, 8, threads);
 
-
-void calc_gaussian_distribution3d(Filter &filter)        // NEEDS FIXING
-{
-    std::default_random_engine generator;
-    std::normal_distribution<double> distribution(0., perturbation_size);
-    
-    for(int loop = 0; loop < perturbation_samples; loop++)
-    {
-        // NEW, PERTURBED VERSION OF THE ORIGINAL SYSTEM
-        voro::container_3d con3d_perturbed (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
-                                            supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2],
-                                            n_x,n_y,n_z,true,true,true,8,threads);
+    for (int loop = 0; loop < perturbation_samples; loop++) {
+        // Clear the container for new perturbed positions
+        con3d_perturbed.clear();
 
         // INSERT PERTURBED PARTICLE POSITIONS INTO CONTAINER
-        for(int c=0; c<number_of_particles; c++)
-        {
-            double x = particle_coordinates[3*c]   + distribution(generator);
-            double y = particle_coordinates[3*c+1] + distribution(generator);
-            double z = particle_coordinates[3*c+2] + distribution(generator);
-            con3d_perturbed.put(c,x,y,z);
+        for (int c = 0; c < number_of_particles; c++) {
+            double x = particle_coordinates[3 * c] + distribution(generator);
+            double y = particle_coordinates[3 * c + 1] + distribution(generator);
+            double z = particle_coordinates[3 * c + 2] + distribution(generator);
+            con3d_perturbed.put(c, x, y, z);
         }
-        
-        Filter local_filter[threads];
-        
-    #pragma omp parallel for num_threads(threads)
-        for(voro::container_3d::iterator cli=con3d_perturbed.begin();cli<con3d_perturbed.end();cli++)
-        {
+
+        std::vector<Filter> local_filter(threads);
+
+        #pragma omp parallel for num_threads(threads)
+        for (auto cli = con3d_perturbed.begin(); cli < con3d_perturbed.end(); ++cli) {
             voro::voronoicell_3d vcell;
-            if (con3d_perturbed.compute_cell(vcell,cli))
-            {
-                std::vector<int> canonical_code;                // CANONICAL CODE WILL BE STORED HERE
-                int chirality = compute_canonical_code(canonical_code, vcell);
-                
-                int tid=omp_get_thread_num();
-                local_filter[tid].increment_or_add(canonical_code,chirality,1);
+            if (con3d_perturbed.compute_cell(vcell, cli)) {
+                std::vector<int> canonical_code;  // CANONICAL CODE WILL BE STORED HERE
+                int chirality = compute_canonical_code_3d(canonical_code, vcell);
+
+                int tid = omp_get_thread_num();
+                local_filter[tid].increment_or_add(canonical_code, chirality, 1);
             }
         }
-        
-        for(int tid=0; tid<threads; tid++)
+
+        for (int tid = 0; tid < threads; tid++) {
             filter.copy_filter(local_filter[tid]);
+        }
     }
 }
 
 
-
-////////////////////////////////////////////////////
-////
-////   RESOLVES INDETERMINATE TYPES.  FOR NOW, WE
-////   TAKE TYPE 2, AND SEE IF THEY'RE CLOSER TO 1
-////   OR 3.  NOT SURE HOW WE SHOULD EXECUTE THIS.
-////
-////////////////////////////////////////////////////
-
-void resolve_indeterminate_types(voro::container_3d& con, Filter &filter)
-{
-    // FIX
-    /*
-    std::random_device r;
-    
-    std::vector <int> closer_to_resolved_primary(number_of_particles,0);
-    std::vector <int> closer_to_resolved_secondary(number_of_particles,0);
-
-    // CHOICES OF SAMPLES AND SIZE ARE LARGELY ARBITRARY
-    std::default_random_engine generator(r());
-    std::normal_distribution<double> distribution(0., 0.05);
-    
-    std::cout<< "Resolving indeterminate types\n";
-    
-    // THIS PART OF THE LOOP SHOULD BE PARALLELIZED, SINCE EACH
-    // CAN BE MADE INDEPENDENTLY
-    for(int loop = 0; loop < resolve_trials; loop++)
-    {
-        std::cout << "Loop " << loop+1 << " of " << resolve_trials << '\n';
-        // NEW, PERTURBED VERSION OF THE PRIMARY SYSTEM
-        voro::particle_order voP;
-        voro::container_3d con_perturbed (supercell_edges[0][0],supercell_edges[1][0],supercell_edges[1][1],
-                                          supercell_edges[2][0],supercell_edges[2][1],supercell_edges[2][2],
-                                          n_x,n_y,n_z,true,true,true,8,threads);
-        
-        voro::voronoicell_3d c;
-        for(voro::container_3d::iterator cli=con.begin();cli<con.end();cli++)
-            if (con.compute_cell(c,cli))
-            {
-                int ijk=cli->ijk,q=cli->q;
-                int pid = con.id[ijk][q];
-                
-                double x,y,z;
-                con.pos(cli,x,y,z);
-                
-                double psize = pow(volumes[pid],1./3.);
-                
-                x += distribution(generator)*psize;
-                y += distribution(generator)*psize;
-                z += distribution(generator)*psize;
-                
-                con_perturbed.put(voP,pid,x,y,z);
-            }
-
-        
-        for(voro::container_3d::iterator cli=con_perturbed.begin();cli<con_perturbed.end();cli++)
-            //if (con_perturbed.compute_cell(c,cli))
-            {
-                int ijk=cli->ijk,q=cli->q;
-                int pid = con_perturbed.id[ijk][q];
-                
-                if(filter.is_indeterminate(vt_structure_types[pid]))
-                {
-                    if(con_perturbed.compute_cell(c,cli))
-                    {
-                        int ijk=cli->ijk,q=cli->q;
-                        int pid = con_perturbed.id[ijk][q];
-                        int ntype = filter.vt_structure_type(calc_topology_vector(c));
-
-                        if     (ntype == filter.resolved_types[vt_structure_types[pid]].first)  closer_to_resolved_primary  [pid]++;
-                        else if(ntype == filter.resolved_types[vt_structure_types[pid]].second) closer_to_resolved_secondary[pid]++;
-                    }
-                }
-            }
-
-    }
-
-    for(int c=0; c<number_of_particles; c++) if(filter.is_indeterminate(vt_structure_types[c]))
-    {
-        if(closer_to_resolved_secondary[c]>closer_to_resolved_primary[c]) vt_structure_types_resolved[c] = filter.resolved_types[vt_structure_types[c]].second;
-        else vt_structure_types_resolved[c] = filter.resolved_types[vt_structure_types[c]].first;
-    }
-    else
-        vt_structure_types_resolved[c] = vt_structure_types[c];
-     */
-}
 
 
 void pair_correlation_analysis(void)
 {
+    validate_max_radius(max_radius);
     // HOW FAR AWAY FROM CENTRAL PARTICLE; DEFAULT
     // SETTING IS 20; MAX VALUE IS 127.
     
@@ -570,6 +444,7 @@ void pair_correlation_analysis(void)
     {
         double avg =      (double(total_neighbor_counts[k])   /double(number_of_particles))/normalization[k];
         double variance = (double(total_neighbor_counts_sq[k])/double(number_of_particles) - avg*avg*normalization[k]*normalization[k])/normalization[k]/normalization[k];
+        if(abs(variance)<1e-15) variance=0;
         double std = sqrt(variance);
         
         total += double(total_neighbor_counts[k]) / double(number_of_particles);
@@ -720,6 +595,8 @@ void pair_correlation_analysis2(void)
 
 void cluster_analysis(void)
 {
+    const int DEFAULT_MAX_CLUSTER_SIZE = 100;
+
     int total_defect_particles  = 0;
     int total_crystal_particles = 0;
     
@@ -852,7 +729,7 @@ void cluster_analysis(void)
     ////
     ////////////////////////////////////////////////////
     
-    unsigned int max_cluster_size = 100;
+    unsigned int max_cluster_size = DEFAULT_MAX_CLUSTER_SIZE;
     std::vector<int> c_sizes(max_cluster_size,0);
     double sum_of_squares = 0;
     
@@ -901,7 +778,7 @@ void cluster_analysis(void)
 ////
 ////////////////////////////////////////////////////
 
-void defect_cluster_analysis(void)
+void defect_cluster_analysis(void)  // EXPERIMENTAL
 {
     int total_defect_particles  = 0;
     std::vector <std::vector <int>> clusters_bad;

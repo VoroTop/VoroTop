@@ -24,6 +24,7 @@
 #include <iostream>
 #include <chrono>
 #include <stdio.h>
+#include <stdexcept>
 
 #include "filters.hh"
 #include "variables.hh"
@@ -44,6 +45,9 @@ std::basic_istream<CharT>& ignore_m(std::basic_istream<CharT>& in){
 ////   LAMMPS DUMP AND ATOMEYE EXTENDED CFG FORMATS.
 ////
 ////////////////////////////////////////////////////
+
+const int LAMMPS_HEADER_LINES = 2;
+const int BOX_BOUNDS_LINES = 4;
 
 void parse_header(std::ifstream& fp)
 {
@@ -67,19 +71,22 @@ void parse_header(std::ifstream& fp)
     ////
     ////////////////////////////////////////////////////
     
+    if (!fp.is_open()) {
+        throw std::runtime_error("Error opening file");
+    }
+
     std::string full_line;
     getline(fp, full_line);
     
     if (full_line.find("ITEM: TIMESTEP") != std::string::npos)
     {
         // LAMMPS DUMP FILE FORMAT
-        header_lines=2;
+        header_lines = LAMMPS_HEADER_LINES;
     }
     
     else
     {
-        std::cout << "Unrecognized data file format\n";
-        exit(0);
+        throw std::runtime_error("Unrecognized data file format");
     }
     
     
@@ -89,130 +96,139 @@ void parse_header(std::ifstream& fp)
     ////
     ////////////////////////////////////////////////////
     
-        bool done=0;
-        while(done==0)
+    bool done=0;
+    while(done==0)
+    {
+        getline(fp, full_line);
+        std::istringstream iss(full_line);
+        
+        if (full_line.find("ITEM: NUMBER OF ATOMS") != std::string::npos)
         {
-            getline(fp, full_line);
-            std::istringstream iss(full_line);
-            
-            if (full_line.find("ITEM: NUMBER OF ATOMS") != std::string::npos)
-            {
-                fp >> number_of_particles;
-                header_lines+=2;
-            }
-            
-            if (full_line.find("ITEM: DIMENSION") != std::string::npos)
-            {
-                fp >> dimension;
-                header_lines+=2;
-            }
-            
-            else if (full_line.find("ITEM: BOX BOUNDS pp pp pp") != std::string::npos)          // PERIODIC IN ALL THREE DIRECTIONS
-            {
-                for(int c=0; c<3; c++)
-                {
-                    fp >> origin[c];
-                    fp >> hi_bound[c];
-                    supercell_edges[c][c] = hi_bound[c]-origin[c];
-                }
-                header_lines+=4;
-            }
-            
-            else if (full_line.find("ITEM: BOX BOUNDS xy xz yz pp pp pp") != std::string::npos) // TRICLINIC CRYSTAL SYSTEM
-            {
-                fp >> xlo_bound >> xhi_bound >> xy;
-                fp >> ylo_bound >> yhi_bound >> xz;
-                fp >> zlo_bound >> zhi_bound >> yz;
-                
-                origin  [2] = zlo_bound;
-                hi_bound[2] = zhi_bound;
-                
-                origin  [1] = ylo_bound - fmin(0.,yz);
-                hi_bound[1] = yhi_bound - fmax(0.,yz);
-                
-                origin  [0] = xlo_bound - fmin(fmin(0.0,xy),fmin(xz,xy+xz));
-                hi_bound[0] = xhi_bound - fmax(fmax(0.0,xy),fmax(xz,xy+xz));
-                
-                supercell_edges[1][0] = xy;
-                supercell_edges[2][0] = xz;
-                supercell_edges[2][1] = yz;
-                
-                for(int c=0; c<3; c++)
-                    supercell_edges[c][c] = hi_bound[c]-origin[c];
-                
-                header_lines+=4;
-            }
-            
-            else if (full_line.find("ITEM: ATOMS ") != std::string::npos)
-            {
-                // DETERMINE ATOM ATTRIBUTES, INDEX OF COORDINATES, AND SCALING
-                std::string entry;
-                iss >> entry;   // READS IN "ITEM:"
-                iss >> entry;   // READS IN "ATOMS"
-                
-                std::vector<std::string> attribute_labels;
-                while(iss >> entry)                             // READ ATTRIBUTE LABELS, I.E., 'id', 'type', 'x', 'y', and 'z'
-                    attribute_labels.push_back(entry);
-                particle_attributes = attribute_labels.size();
-                
-                index_id=-1;
-                index_x=-1;
-                index_y=-1;
-                index_z=-1;
-                scaled_coordinates=0;
-                
-                for(long unsigned int c=0; c<attribute_labels.size(); c++)
-                {
-                    if(attribute_labels[c]=="id") index_id = c;
-
-                    if(attribute_labels[c]=="x") index_x = c;
-                    if(attribute_labels[c]=="y") index_y = c;
-                    if(attribute_labels[c]=="z") index_z = c;
-
-                    if(attribute_labels[c]=="xs") { index_x = c; scaled_coordinates=1; }
-                    if(attribute_labels[c]=="ys") { index_y = c; scaled_coordinates=1; }
-                    if(attribute_labels[c]=="zs") { index_z = c; scaled_coordinates=1; }
-                }
-                
-                if(index_z==-1) dimension = 2;
-                if(index_x==-1 || index_y==-1)
-                {
-                    std::cout << "Insufficient xyz coordinates included in dump file.\n";
-                    exit(-1);
-                }
-                
-                header_lines+=1;
-                done=1;
-            }
+            fp >> number_of_particles;
+            header_lines+=2;
         }
-    
-    // IF particles_in_eps WAS SET INITIALLY TO 0, THEN WE WANT TO
-    // DRAW ALL PARTICLES
-    if(particles_in_eps==0) particles_in_eps=number_of_particles;
-    int total_blocks = number_of_particles/8;
-    double volume = supercell_edges[0][0]*supercell_edges[1][1]*supercell_edges[2][2];  // APPROXIMATION
-    double volume_per_block = volume/(double)total_blocks;
-    double length_per_cube = pow(volume_per_block, 1./3.);
-    
-    // FIX: THE n_x ETC NUMBERS NEEDS TO BE SCALED ACCORDING TO THE SYSTEM
-    // LENGTHS; THE CODE HERE IS OPTIMAL FOR A SQUARE AND CUBE, BUT NOT FOR
-    // GENERAL RECTANGLES ETC
-    n_x = int(supercell_edges[0][0]/length_per_cube+1);
-    n_y = int(supercell_edges[1][1]/length_per_cube+1);
-    n_z = int(supercell_edges[2][2]/length_per_cube+1);
+        
+        if (full_line.find("ITEM: DIMENSION") != std::string::npos)
+        {
+            fp >> dimension;
+            header_lines+=2;
+        }
+        
+        else if (full_line.find("ITEM: BOX BOUNDS pp pp pp") != std::string::npos)          // PERIODIC IN ALL THREE DIRECTIONS
+        {
+            for(int c=0; c<3; c++)
+            {
+                fp >> origin[c];
+                fp >> hi_bound[c];
+                supercell_edges[c][c] = hi_bound[c]-origin[c];
+            }
+            header_lines += BOX_BOUNDS_LINES;
+        }
+        
+        else if (full_line.find("ITEM: BOX BOUNDS xy xz yz pp pp pp") != std::string::npos) // TRICLINIC CRYSTAL SYSTEM
+        {
+            fp >> xlo_bound >> xhi_bound >> xy;
+            fp >> ylo_bound >> yhi_bound >> xz;
+            fp >> zlo_bound >> zhi_bound >> yz;
+            
+            origin  [2] = zlo_bound;
+            hi_bound[2] = zhi_bound;
+            
+            origin  [1] = ylo_bound - fmin(0.,yz);
+            hi_bound[1] = yhi_bound - fmax(0.,yz);
+            
+            origin  [0] = xlo_bound - fmin(fmin(0.0,xy),fmin(xz,xy+xz));
+            hi_bound[0] = xhi_bound - fmax(fmax(0.0,xy),fmax(xz,xy+xz));
+            
+            supercell_edges[1][0] = xy;
+            supercell_edges[2][0] = xz;
+            supercell_edges[2][1] = yz;
+            
+            for(int c=0; c<3; c++)
+                supercell_edges[c][c] = hi_bound[c]-origin[c];
+            
+            header_lines+=4;
+        }
+        
+        else if (full_line.find("ITEM: ATOMS ") != std::string::npos)
+        {
+            // DETERMINE ATOM ATTRIBUTES, INDEX OF COORDINATES, AND SCALING
+            std::string entry;
+            iss >> entry;   // READS IN "ITEM:"
+            iss >> entry;   // READS IN "ATOMS"
+            
+            std::vector<std::string> attribute_labels;
+            while(iss >> entry)                             // READ ATTRIBUTE LABELS, I.E., 'id', 'type', 'x', 'y', and 'z'
+                attribute_labels.push_back(entry);
+            particle_attributes = attribute_labels.size();
+            
+            index_id=-1;
+            index_x=-1;
+            index_y=-1;
+            index_z=-1;
+            scaled_coordinates=0;
+            
+            for(long unsigned int c=0; c<attribute_labels.size(); c++)
+            {
+                if(attribute_labels[c]=="id") index_id = c;
 
+                if(attribute_labels[c]=="x") index_x = c;
+                if(attribute_labels[c]=="y") index_y = c;
+                if(attribute_labels[c]=="z") index_z = c;
+
+                if(attribute_labels[c]=="xs") { index_x = c; scaled_coordinates=1; }
+                if(attribute_labels[c]=="ys") { index_y = c; scaled_coordinates=1; }
+                if(attribute_labels[c]=="zs") { index_z = c; scaled_coordinates=1; }
+            }
+            
+            if(index_z==-1) dimension = 2;
+            if(index_x==-1 || index_y==-1)
+            {
+                throw std::runtime_error("Insufficient xyz coordinates included in dump file.");
+            }
+            
+            header_lines+=1;
+            done=1;
+        }
+    }
+    
+    if (dimension != 2 && dimension != 3) {
+        throw std::runtime_error("Unsupported dimension: " + std::to_string(dimension));
+    }
+    
+    // EACH BLOCK SHOULD BE ROUGLY A SQUARE OR CUBE AND CONTAIN 
+    // ROUGHLY THE SAME NUMBER OF PARTICLES
     if(dimension==2)
-        n_x = n_y = (int)pow(number_of_particles/2, 0.5);
+    {
+        int total_blocks = number_of_particles/4.+1;
+        double area = supercell_edges[0][0]*supercell_edges[1][1];  
+        double area_per_block = area/(double)total_blocks;          
+        double length_per_cube = pow(area_per_block, 1./2.);
+        n_x = (int)supercell_edges[0][0]/length_per_cube+1;
+        n_y = (int)supercell_edges[1][1]/length_per_cube+1;
+    }
 
     if(dimension==3)
-        n_x = n_y = n_z = (int)pow(number_of_particles/4, 0.333);    
+    {
+        int total_blocks = number_of_particles/4.+1;
+        double volume = supercell_edges[0][0]*supercell_edges[1][1]*supercell_edges[2][2]; 
+        double volume_per_block = volume/(double)total_blocks;
+        double length_per_cube = pow(volume_per_block, 1./3.);
+        n_x = (int)supercell_edges[0][0]/length_per_cube+1;
+        n_y = (int)supercell_edges[1][1]/length_per_cube+1;
+        n_z = (int)supercell_edges[2][2]/length_per_cube+1;
+    }
 }
 
 
-void import_data(std::ifstream& fp)
+// THIS USES A C-STYLE FILE* FOR READING DATA FROM THE INPUT FILE.
+void import_data()
 {
-    FILE *in_file;
-    in_file=voro::safe_fopen(filename_data.c_str(),"r");
+    FILE *in_file = fopen(filename_data.c_str(), "r");
+    if (!in_file) {
+        throw std::runtime_error("Error opening file");
+    }
+
     for(int i=0; i<header_lines; i++)
         fscanf(in_file, "%*[^\n]\n");
 
@@ -224,15 +240,18 @@ void import_data(std::ifstream& fp)
 
         for(int d=0; d<particle_attributes; d++)
         {
-            if     (d==index_id) fscanf(in_file,"%d",&id);
-            else if(d==index_x)  fscanf(in_file,"%lg",&x);
-            else if(d==index_y)  fscanf(in_file,"%lg",&y);
-            else if(d==index_z)  fscanf(in_file,"%lg",&z);
-            else                 fscanf(in_file,"%lg",&junk);
+            int result;
+            if     (d==index_id) result = fscanf(in_file,"%d",&id);
+            else if(d==index_x)  result = fscanf(in_file,"%lg",&x);
+            else if(d==index_y)  result = fscanf(in_file,"%lg",&y);
+            else if(d==index_z)  result = fscanf(in_file,"%lg",&z);
+            else                 result = fscanf(in_file,"%lg",&junk);
+
+            if (result != 1) {
+                throw std::runtime_error("Error reading attribute data from file");
+            }
         }
 
-        // ADJUST COORDINATES SO SYSTEM UNSCALED AND AT ORIGIN
-        // NEEDS FIXING
         if(scaled_coordinates==0)
         {
             x -= origin[0];
@@ -264,8 +283,10 @@ void import_data(std::ifstream& fp)
             particle_coordinates[dimension*c+2]=z;
         }
         
-        if(index_id!=-1) particle_ids[c]=id;    // IF ID NOT INCLUDED, LABEL EACH PARTICLE BY ITS NATURAL ORDERING
-        else particle_ids[c]=c+1;
+        if(index_id!=-1) particle_ids[c]=id;    // IF PROVIDED, STORE GIVEN PARTICLE IDS
+        else particle_ids[c]=c+1;               // IF ID NOT PROVIDED, LABEL EACH PARTICLE BY ITS
+                                                // GIVEN ORDER, BEGINNING FROM 1. INTERNALLY, PARTICLES
+                                                // WILL USE IDS 0, 1, ..., number_of_particles-1.
     }
     
     fclose(in_file);
