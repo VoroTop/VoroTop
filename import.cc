@@ -163,9 +163,9 @@ void parse_header(std::ifstream& fp)
             particle_attributes = attribute_labels.size();
             
             index_id=-1;
-            index_x=-1;
-            index_y=-1;
-            index_z=-1;
+            index_x =-1;
+            index_y =-1;
+            index_z =-1;
             scaled_coordinates=0;
             
             for(long unsigned int c=0; c<attribute_labels.size(); c++)
@@ -192,6 +192,24 @@ void parse_header(std::ifstream& fp)
         }
     }
     
+    if(index_id == -1)
+    {
+        std::cerr << "Warning: No particle IDs found in the file. Using default IDs." << std::endl;
+    }
+
+    if(index_x == -1 || index_y == -1)
+    {
+        throw std::runtime_error("Insufficient xyz coordinates included in dump file.");
+    }
+
+    if(index_z == -1)
+    {
+        dimension = 2;
+        supercell_edges[2][0] = 0.;
+        supercell_edges[2][1] = 0.;
+        supercell_edges[2][2] = 0.;
+    }
+
     if (dimension != 2 && dimension != 3) {
         throw std::runtime_error("Unsupported dimension: " + std::to_string(dimension));
     }
@@ -251,7 +269,7 @@ void import_data()
                 throw std::runtime_error("Error reading attribute data from file");
             }
         }
-
+        
         if(scaled_coordinates==0)
         {
             x -= origin[0];

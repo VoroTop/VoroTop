@@ -59,13 +59,10 @@ void help_message(void) {
     " -d    : Compute distribution of Voronoi topologies, represented as either       \n"
     "         p-vectors or Weinberg vectors, and save to <filename>.distribution.     \n"
     " -f    : Generate a LAMMPS <filename>.dump file using a filter provided by user  \n"
-    "                                                                                 \n"
-    " -t    : Specify number of threads to use.                                       \n"
     " -g    : Compute distribution of w-vectors for perturbations of a system. This   \n"
     "         option should be followed by two numbers, one specifying the number of  \n"
     "         samples, the other specifying the size of the random perturbations.     \n"
     "                                                                                 \n"
-    " -r    : Resolve indeterminate types.                                            \n"
     " -c    : Cluster analysis.  Particles with topological types not included in the \n"
     "         specified filter are considered to be defects.  Defect particles with   \n"
     "         adjacent Voronoi cells are considered to belong to the same defect; we  \n"
@@ -73,7 +70,22 @@ void help_message(void) {
     "         assign the constituent particles a unique index.  Similar cluster       \n"
     "         analysis is also performed for types in the filter.  This option        \n"
     "         requires loading a filter file for analysis.                            \n"
-    "                                                                                 \n";
+    " -r    : Resolve indeterminate types.                                            \n"
+    "                                                                                 \n"
+    " -e    : Output 2D system in EPS format.  This option can be followed by one or  \n"
+    "         two arguments.  If one argument is given, it specifies the coloring     \n"
+    "         scheme for the Voronoi cells.  If two arguments are given, the first    \n"
+    "         specifies the coloring scheme and the second specifies the number of    \n"
+    "         particles to be drawn.  The coloring scheme can be one of the following:\n"
+    "            0: No particles drawn                                                   \n"       
+    "            1: Particles drawn in black                                             \n"
+    "            2: Particles colored according to number of edges                       \n"
+    "            3: Particles colored according to filter classification                 \n"
+    "            4: Particles colored according to Voronoi distance from central particle\n"
+    "                                                                                    \n"   
+    " -t    : Specify number of threads to use; if not specified, then this number will  \n"
+    "         be set to one fewer than the number of processors available.               \n"
+    "                                                                                    \n";
 }
 
 
@@ -250,7 +262,7 @@ void parse_command_line_options(int argc, char *argv[])
             e_switch=1;                                    // 1 ARGUMENT : COLOR SCHEME, DRAW ENTIRE SYSTEM
             if(argc > d+1 && argv[d+1][0]!='-')            // 2 ARGUMENTS: COLOR SCHEME, DRAW GIVEN NUMBER OF PARTICLES
             {
-                particle_coloring_scheme = atoi(argv[d+1]);         // FIRST OPTIONAL ARGUMENT GIVES COLOR SCHEME
+                particle_coloring_scheme = atoi(argv[d+1]);     // FIRST OPTIONAL ARGUMENT GIVES COLOR SCHEME
                 
                 if(argc > d+2 && argv[d+2][0]!='-')        // SECOND ARGUMENT, DETERMINES NUMBER OF PARTICLES
                 {
@@ -284,28 +296,42 @@ void parse_command_line_options(int argc, char *argv[])
             d++;
         }
  
+        else if(strcmp(argv[d],"-h")==0 || strcmp(argv[d],"-help")==0) 
+        {
+            help_message();
+            exit(0);
+        }
+
         else
         {
             help_message();
-            throw std::runtime_error("Unidentified option '" + std::string(argv[d]) + "' included.");
+            std::cout << "Unidentified option '" + std::string(argv[d]) + "' included.\n";
+            exit(0);
         }
     }
         
     
     // CHECK COMBINATIONS OF OPTIONS
+    if(e_switch && dimension==3)
+    {
+        std::cout << "-e option not compatible with 3D systems; use -2 option to specify 2D system.\n";
+        exit(0);
+    }
+
     if(r_switch && !f_switch)
     {
-        throw std::runtime_error("-r option requires filter file for resolution analysis");
+        std::cout << "-r option requires filter file for resolution analysis\n";
+        exit(0);
     }
     
     if(c_switch && !f_switch)
     {
-        throw std::runtime_error("-c option requires filter file for cluster analysis");
+        std::cout << "-c option requires filter file for cluster analysis\n";
     }
     
     if(vt_switch && f_switch)
     {
-        throw std::runtime_error("-w option not compatible with other options");
+        std::cout << "-w option not compatible with other options\n";
     }
 }
 

@@ -15,7 +15,6 @@
 ########################################################
 
 ### Compiler Configuration ###
-#CXX      := clang++-mp-19 
 CXX      := g++-mp-13
 CXXSTD   := -std=c++11
 CXXFLAGS := -Wall -Wextra -O3 -fopenmp -MMD -MP

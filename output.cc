@@ -27,7 +27,7 @@
 #include "variables.hh"
 
 
-void output_system(std::string filename)
+void output_lammps_dump(std::string filename)
 {
     std::string output_file_name = filename + ".dump";
     std::ofstream output_file(output_file_name.c_str(), std::ofstream::out);
@@ -189,13 +189,13 @@ void output_eps(voro::container_2d& con, std::string filename)
     //  3. EPS FIGURE, MEASURED IN POINTS, 72 POINTS = 1 INCH
     
     // SYSTEM MEASURED IN NATURAL UNITS GIVEN BY LAMMPS (ANGSTROMS, ETC)
-    double system_width = hi_bound[0] - origin[0];
+    double system_width  = hi_bound[0] - origin[0];
     double system_height = hi_bound[1] - origin[1];
     
     // BY DEFAULT WE WILL DRAW THE ENTIRE SYSTEM; BUT IF THE USER CHOOSES TO DRAW
     // A SMALLER PART OF THE SYSTEM, THEN WE WILL ADJUST THESE WINDOWS ACCORDINGLY.
     // THIS FEATURE CAN BE USEFUL WHEN CONSIDERING VERY LARGE SYSTEMS.
-    double inner_window_width = system_width;
+    double inner_window_width  = system_width;
     double inner_window_height = system_height;
     
     // IF particles_in_eps WAS NOT SPECIFIED, THEN DRAW ALL PARTICLES.  

@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
        f_switch==0 &&  u_switch==0 && v_switch==0 && e_switch==0)
     {
         help_message();
-        handle_error("No valid options specified.");
+        std::cout << "No valid options specified.\n";
     }
         
     
@@ -225,7 +225,7 @@ int main(int argc, char *argv[])
     {
         if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
         else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
-        output_system(filename_data);
+        output_lammps_dump(filename_data);
     }
     
     else if(u_switch || v_switch)  

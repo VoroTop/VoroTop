@@ -42,9 +42,9 @@ void cluster_analysis2        (void);
 void defect_cluster_analysis  (void);   // EXPERIMENTAL
 void pair_correlation_analysis(void);
 
-void output_system    (std::string filename);
-void output_eps       (voro::container_2d& con, std::string filename);
-void ring_coloring    ();
+void output_lammps_dump (std::string filename);
+void output_eps         (voro::container_2d& con, std::string filename);
+void ring_coloring      ();
 
 void classify_particles_by_voronoi_topology_2d(Filter &filter);
 int  classify_particles_by_voronoi_topology_3d(voro::container_3d& con, Filter &filter);
