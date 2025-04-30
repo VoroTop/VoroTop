@@ -51,7 +51,7 @@ void count_and_store_neighbors_2d(container_2d& con)
             const int ijk=cli->ijk,q=cli->q;
             const int pid = con.id[ijk][q];
             cell_neighbor_count[pid]=c.p;
-            c.neighbors(neighbors_list_char[pid]);
+            c.neighbors(list_of_neighbors[pid]);
         }
         else
         {
@@ -72,8 +72,8 @@ void count_and_store_neighbors_3d(container_3d& con)
         {
             const int ijk=cli->ijk,q=cli->q;
             const int pid = con.id[ijk][q];
-            c.neighbors(neighbors_list_char[pid]);
-            cell_neighbor_count[pid]=neighbors_list_char[pid].size();
+            c.neighbors(list_of_neighbors[pid]);
+            cell_neighbor_count[pid]=list_of_neighbors[pid].size();
         }
         else
         {
@@ -88,8 +88,8 @@ void calc_distribution_2d(Filter &filter)
 {
     std::vector<Filter> local_filter(threads);
     
-    double xdim = hi_bound[0]-origin[0];
-    double ydim = hi_bound[1]-origin[1];
+    double system_width  = xhi-xlo;
+    double system_height = yhi-ylo;
 
 #pragma omp parallel for num_threads(threads)
     for (int pid=0; pid<number_of_particles; pid++)
@@ -100,15 +100,15 @@ void calc_distribution_2d(Filter &filter)
         
         for(unsigned int q=0; q<number_of_neighbors; q++)
         {
-            double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
-            double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
-            if(dx >  xdim/2) dx -= xdim;
-            if(dx < -xdim/2) dx += xdim;
-            if(dy >  ydim/2) dy -= ydim;
-            if(dy < -ydim/2) dy += ydim;
+            double dx = particle_coordinates[2*list_of_neighbors[pid][q]]   - particle_coordinates[2*pid];
+            double dy = particle_coordinates[2*list_of_neighbors[pid][q]+1] - particle_coordinates[2*pid+1];
+            if(dx >  system_width/2.)  dx -= system_width;
+            if(dx < -system_width/2.)  dx += system_width;
+            if(dy >  system_height/2.) dy -= system_height;
+            if(dy < -system_height/2.) dy += system_height;
             double theta = std::atan2(dy, dx);
             
-            int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
+            int p_id = cell_neighbor_count[list_of_neighbors[pid][q]];
             unordered_neighbors.emplace_back(theta, p_id);
         }
         std::sort(unordered_neighbors.begin(), unordered_neighbors.end());
@@ -187,8 +187,8 @@ void  print_topology_vectors_2d(std::string filename)
     // BUFFER OUTPUT FROM EACH THREAD
     std::vector<stringstream> buf(threads);
 
-    double xdim = hi_bound[0]-origin[0];
-    double ydim = hi_bound[1]-origin[1];
+    double system_width  = xhi-xlo;
+    double system_height = yhi-ylo;
     
 #pragma omp parallel for num_threads(threads)
     for (int pid=0; pid<number_of_particles; pid++) 
@@ -202,18 +202,18 @@ void  print_topology_vectors_2d(std::string filename)
         
         for(unsigned int q=0; q<number_of_neighbors; q++)
         {
-            p2pvector[cell_neighbor_count[neighbors_list_char[pid][q]]]++;
-            if(cell_neighbor_count[neighbors_list_char[pid][q]]>maxp) maxp = cell_neighbor_count[neighbors_list_char[pid][q]];
+            p2pvector[cell_neighbor_count[list_of_neighbors[pid][q]]]++;
+            if(cell_neighbor_count[list_of_neighbors[pid][q]]>maxp) maxp = cell_neighbor_count[list_of_neighbors[pid][q]];
             
-            double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
-            double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
-            if(dx >  xdim/2) dx -= xdim;
-            if(dx < -xdim/2) dx += xdim;
-            if(dy >  ydim/2) dy -= ydim;
-            if(dy < -ydim/2) dy += ydim;
+            double dx = particle_coordinates[2*list_of_neighbors[pid][q]]   - particle_coordinates[2*pid];
+            double dy = particle_coordinates[2*list_of_neighbors[pid][q]+1] - particle_coordinates[2*pid+1];
+            if(dx >  system_width/2.)  dx -= system_width;
+            if(dx < -system_width/2.)  dx += system_width;
+            if(dy >  system_height/2.) dy -= system_height;
+            if(dy < -system_height/2.) dy += system_height;
             double theta = std::atan2(dy, dx);
 
-            int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
+            int p_id = cell_neighbor_count[list_of_neighbors[pid][q]];
             unordered_neighbors.emplace_back(theta, p_id);
         }
         std::sort(unordered_neighbors.begin(), unordered_neighbors.end());
@@ -770,9 +770,9 @@ int classify_particles_by_voronoi_topology_3d(container_3d& con, Filter &filter)
 
 void classify_particles_by_voronoi_topology_2d(Filter &filter)
 {
-    double xdim = hi_bound[0]-origin[0];
-    double ydim = hi_bound[1]-origin[1];
-    
+    double system_width  = xhi-xlo;
+    double system_height = yhi-ylo;
+        
 #pragma omp parallel for num_threads(threads)
     for (int pid=0; pid<number_of_particles; pid++)
     {
@@ -782,15 +782,15 @@ void classify_particles_by_voronoi_topology_2d(Filter &filter)
         
         for(unsigned int q=0; q<number_of_neighbors; q++)
         {
-            double dx = particle_coordinates[2*neighbors_list_char[pid][q]]   - particle_coordinates[2*pid];
-            double dy = particle_coordinates[2*neighbors_list_char[pid][q]+1] - particle_coordinates[2*pid+1];
-            if(dx >  xdim/2) dx -= xdim;
-            if(dx < -xdim/2) dx += xdim;
-            if(dy >  ydim/2) dy -= ydim;
-            if(dy < -ydim/2) dy += ydim;
+            double dx = particle_coordinates[2*list_of_neighbors[pid][q]]   - particle_coordinates[2*pid];
+            double dy = particle_coordinates[2*list_of_neighbors[pid][q]+1] - particle_coordinates[2*pid+1];
+            if(dx >  system_width/2.)  dx -= system_width;
+            if(dx < -system_width/2.)  dx += system_width;
+            if(dy >  system_height/2.) dy -= system_height;
+            if(dy < -system_height/2.) dy += system_height;
             double theta = std::atan2(dy, dx);
 
-            int p_id = cell_neighbor_count[neighbors_list_char[pid][q]];
+            int p_id = cell_neighbor_count[list_of_neighbors[pid][q]];
             unordered_neighbors.emplace_back(theta, p_id);
         }
         std::sort(unordered_neighbors.begin(), unordered_neighbors.end());

@@ -53,20 +53,6 @@ void parse_header(std::ifstream& fp)
 {
     ////////////////////////////////////////////////////
     ////
-    ////    INITIALIZE VARIABLES
-    ////
-    ////////////////////////////////////////////////////
-    
-    origin[0]=0.;
-    origin[1]=0.;
-    origin[2]=0.;
-    for(int c=0; c<3; c++)
-        for(int d=0; d<3; d++)
-            supercell_edges[c][d]=0;
-    
-    
-    ////////////////////////////////////////////////////
-    ////
     ////    DETERMINE FILE TYPE
     ////
     ////////////////////////////////////////////////////
@@ -116,37 +102,27 @@ void parse_header(std::ifstream& fp)
         
         else if (full_line.find("ITEM: BOX BOUNDS pp pp pp") != std::string::npos)          // PERIODIC IN ALL THREE DIRECTIONS
         {
-            for(int c=0; c<3; c++)
-            {
-                fp >> origin[c];
-                fp >> hi_bound[c];
-                supercell_edges[c][c] = hi_bound[c]-origin[c];
-            }
+            triclinic_crystal_system = 0;
+        
+            fp >> xlo;
+            fp >> xhi;
+            fp >> ylo;
+            fp >> yhi;
+            fp >> zlo;
+            fp >> zhi;
+
             header_lines += BOX_BOUNDS_LINES;
         }
         
         else if (full_line.find("ITEM: BOX BOUNDS xy xz yz pp pp pp") != std::string::npos) // TRICLINIC CRYSTAL SYSTEM
         {
-            fp >> xlo_bound >> xhi_bound >> xy;
-            fp >> ylo_bound >> yhi_bound >> xz;
-            fp >> zlo_bound >> zhi_bound >> yz;
+            triclinic_crystal_system = 1;
             
-            origin  [2] = zlo_bound;
-            hi_bound[2] = zhi_bound;
-            
-            origin  [1] = ylo_bound - fmin(0.,yz);
-            hi_bound[1] = yhi_bound - fmax(0.,yz);
-            
-            origin  [0] = xlo_bound - fmin(fmin(0.0,xy),fmin(xz,xy+xz));
-            hi_bound[0] = xhi_bound - fmax(fmax(0.0,xy),fmax(xz,xy+xz));
-            
-            supercell_edges[1][0] = xy;
-            supercell_edges[2][0] = xz;
-            supercell_edges[2][1] = yz;
-            
-            for(int c=0; c<3; c++)
-                supercell_edges[c][c] = hi_bound[c]-origin[c];
-            
+            std::cout << "VoroTop currently unable to handle triclinic box." << std::endl;
+            std::cout << "Please use a cubic or orthorhombic box." << std::endl;
+            std::cout << "Exiting." << std::endl;
+            exit(1);
+                        
             header_lines+=4;
         }
         
@@ -203,12 +179,7 @@ void parse_header(std::ifstream& fp)
     }
 
     if(index_z == -1)
-    {
         dimension = 2;
-        supercell_edges[2][0] = 0.;
-        supercell_edges[2][1] = 0.;
-        supercell_edges[2][2] = 0.;
-    }
 
     if (dimension != 2 && dimension != 3) {
         throw std::runtime_error("Unsupported dimension: " + std::to_string(dimension));
@@ -219,22 +190,30 @@ void parse_header(std::ifstream& fp)
     if(dimension==2)
     {
         int total_blocks = number_of_particles/4.+1;
-        double area = supercell_edges[0][0]*supercell_edges[1][1];  
+        double area = (xhi-xlo)*(yhi-ylo);  
         double area_per_block = area/(double)total_blocks;          
         double length_per_cube = pow(area_per_block, 1./2.);
-        n_x = (int)supercell_edges[0][0]/length_per_cube+1;
-        n_y = (int)supercell_edges[1][1]/length_per_cube+1;
+        n_x = (int)(xhi-xlo)/length_per_cube+1;
+        n_y = (int)(yhi-ylo)/length_per_cube+1;
     }
 
     if(dimension==3)
     {
         int total_blocks = number_of_particles/4.+1;
-        double volume = supercell_edges[0][0]*supercell_edges[1][1]*supercell_edges[2][2]; 
+        double volume = (xhi-xlo)*(yhi-ylo)*(zhi-zlo);
         double volume_per_block = volume/(double)total_blocks;
         double length_per_cube = pow(volume_per_block, 1./3.);
-        n_x = (int)supercell_edges[0][0]/length_per_cube+1;
-        n_y = (int)supercell_edges[1][1]/length_per_cube+1;
-        n_z = (int)supercell_edges[2][2]/length_per_cube+1;
+        n_x = (int)(xhi-xlo)/length_per_cube+1;
+        n_y = (int)(yhi-ylo)/length_per_cube+1;
+        n_z = (int)(zhi-zlo)/length_per_cube+1;
+    }
+
+    if(particles_in_eps==0) particles_in_eps=number_of_particles; 
+    if(particles_in_eps > number_of_particles)        
+    {
+        std::cout << "Warning: Number of particles in file is less than number of particles specified to be drawn." << std::endl;
+        std::cout << "Will draw all " << number_of_particles << " in file." << std::endl;
+        particles_in_eps = number_of_particles;
     }
 }
 
@@ -270,22 +249,24 @@ void import_data()
             }
         }
         
+        // ENSURE COORDINATES ARE WITHIN BOUNDS
         if(scaled_coordinates==0)
         {
-            x -= origin[0];
-            y -= origin[1];
-            z -= origin[2];
+            if(x<xlo) x += (xhi-xlo);
+            if(y<ylo) y += (yhi-ylo);
+            if(z<zlo) z += (zhi-zlo);
+            
+            if(x>xhi) x -= (xhi-xlo);
+            if(y>yhi) y -= (yhi-ylo);
+            if(z>zhi) z -= (zhi-zlo);
         }
         
         if(scaled_coordinates==1)
         {
-            double newx = supercell_edges[0][0]*x + supercell_edges[1][0]*y + supercell_edges[2][0]*z;
-            double newy = supercell_edges[0][1]*x + supercell_edges[1][1]*y + supercell_edges[2][0]*z;
-            double newz = supercell_edges[0][2]*x + supercell_edges[1][2]*y + supercell_edges[2][0]*z;
-
-            x=newx;
-            y=newy;
-            z=newz;
+            std::cout << "VoroTop currently unable to handle scaled coordinates." << std::endl;
+            std::cout << "Please use a cubic or orthorhombic box." << std::endl;
+            std::cout << "Exiting." << std::endl;
+            exit(1);
         }
 
         if(dimension==2)

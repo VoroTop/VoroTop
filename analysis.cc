@@ -105,10 +105,10 @@ void cluster_analysis2()
                 int neighbor_count = cell_neighbor_count[w];
                 for(int e=0; e<neighbor_count; e++)
                 {
-                    if(visited[neighbors_list_char[w][e]]==0)
+                    if(visited[list_of_neighbors[w][e]]==0)
                     {
-                        visited[neighbors_list_char[w][e]]=1;
-                        q.push(neighbors_list_char[w][e]);
+                        visited[list_of_neighbors[w][e]]=1;
+                        q.push(list_of_neighbors[w][e]);
                     }
                 }
             }
@@ -143,10 +143,10 @@ void cluster_analysis2()
                 int neighbor_count = cell_neighbor_count[w];
                 for(int e=0; e<neighbor_count; e++)
                 {
-                    if(visited[neighbors_list_char[w][e]]==0)
+                    if(visited[list_of_neighbors[w][e]]==0)
                     {
-                        visited[neighbors_list_char[w][e]]=1;
-                        q.push(neighbors_list_char[w][e]);
+                        visited[list_of_neighbors[w][e]]=1;
+                        q.push(list_of_neighbors[w][e]);
                     }
                 }
             }
@@ -239,8 +239,8 @@ void calc_gaussian_distribution_2d(Filter &filter)
     std::normal_distribution<double> distribution(0., perturbation_size);
     
     // NEW, PERTURBED VERSION OF THE ORIGINAL SYSTEM
-    voro::container_2d con2d_perturbed (origin[0],hi_bound[0],origin[1],hi_bound[1],n_x,n_y,true,true,4,threads);
-        
+    voro::container_2d con2d_perturbed (xlo,xhi,ylo,yhi,n_x,n_y,true,true,4,threads);
+    
     for(int loop = 0; loop < perturbation_samples; loop++)
     {
         for(int c=0; c<number_of_particles; c++)
@@ -270,8 +270,7 @@ void calc_gaussian_distribution_3d(Filter &filter) {
     std::normal_distribution<double> distribution(0., perturbation_size);
 
     // Create a container for perturbed particles
-    voro::container_3d con3d_perturbed(supercell_edges[0][0], supercell_edges[1][0], supercell_edges[1][1],
-                                       supercell_edges[2][0], supercell_edges[2][1], supercell_edges[2][2],
+    voro::container_3d con3d_perturbed(xlo,xhi,ylo,yhi,zlo,zhi,                                       
                                        n_x, n_y, n_z, true, true, true, 8, threads);
 
     for (int loop = 0; loop < perturbation_samples; loop++) {
@@ -311,10 +310,6 @@ void calc_gaussian_distribution_3d(Filter &filter) {
 
 void pair_correlation_analysis(void)
 {
-    validate_max_radius(max_radius);
-    // HOW FAR AWAY FROM CENTRAL PARTICLE; DEFAULT
-    // SETTING IS 20; MAX VALUE IS 127.
-    
     // FOR NORMALIZING COUNTS
     std::vector<double>                 normalization     (max_radius+1);
     if(u_switch==1)
@@ -402,15 +397,15 @@ void pair_correlation_analysis(void)
             {
                 // ID OF CURRENT PARTICLE
                 int tempc      = cluster[tid][c];
-                int nneighbors = neighbors_list_char[tempc].size();
+                int nneighbors = list_of_neighbors[tempc].size();
                 
                 // ITERATE OVER ALL ITS NEIGHBORS
                 for(int d=0; d<nneighbors; d++)
                 {
-                    if(visited[tid][neighbors_list_char[tempc][d]] == -1)
+                    if(visited[tid][list_of_neighbors[tempc][d]] == -1)
                     {
-                        visited[tid][neighbors_list_char[tempc][d]]=k;
-                        cluster[tid][counter++]=neighbors_list_char[tempc][d];
+                        visited[tid][list_of_neighbors[tempc][d]]=k;
+                        cluster[tid][counter++]=list_of_neighbors[tempc][d];
                         kneighbors[tid][k]++;
                     }
                 }
@@ -522,7 +517,7 @@ void pair_correlation_analysis2(void)
 
         ring0.insert(p);
         for(int s=0; s<cell_neighbor_count[p]; s++)
-            ring1.insert(neighbors_list_char[p][s]);
+            ring1.insert(list_of_neighbors[p][s]);
         
         for(int k=0; k<=max_radius; k++)
         {
@@ -535,7 +530,7 @@ void pair_correlation_analysis2(void)
             std::set <int> big;
             for(std::set<int>::iterator it=ring1.begin(); it != ring1.end(); it++)
                 for(int s=0; s<cell_neighbor_count[*it]; s++)
-                    big.insert(neighbors_list_char[*it][s]);
+                    big.insert(list_of_neighbors[*it][s]);
             ring0.insert(ring1.begin(),ring1.end());
             
             std::set_difference(big.begin(), big.end(), ring0.begin(), ring0.end(),
@@ -643,10 +638,10 @@ void cluster_analysis(void)
                 int neighbor_count = cell_neighbor_count[w];
                 for(int e=0; e<neighbor_count; e++)
                 {
-                    if(visited[neighbors_list_char[w][e]]==0)
+                    if(visited[list_of_neighbors[w][e]]==0)
                     {
-                        visited[neighbors_list_char[w][e]]=1;
-                        q.push(neighbors_list_char[w][e]);
+                        visited[list_of_neighbors[w][e]]=1;
+                        q.push(list_of_neighbors[w][e]);
                     }
                 }
             }
@@ -683,10 +678,10 @@ void cluster_analysis(void)
                 int neighbor_count = cell_neighbor_count[w];
                 for(int e=0; e<neighbor_count; e++)
                 {
-                    if(visited[neighbors_list_char[w][e]]==0)
+                    if(visited[list_of_neighbors[w][e]]==0)
                     {
-                        visited[neighbors_list_char[w][e]]=1;
-                        q.push(neighbors_list_char[w][e]);
+                        visited[list_of_neighbors[w][e]]=1;
+                        q.push(list_of_neighbors[w][e]);
                     }
                 }
             }
@@ -836,10 +831,10 @@ void defect_cluster_analysis(void)  // EXPERIMENTAL
                 int neighbor_count = cell_neighbor_count[w];
                 for(int e=0; e<neighbor_count; e++)
                 {
-                    if(visited[neighbors_list_char[w][e]]==0)
+                    if(visited[list_of_neighbors[w][e]]==0)
                     {
-                        visited[neighbors_list_char[w][e]]=1;
-                        q.push(neighbors_list_char[w][e]);
+                        visited[list_of_neighbors[w][e]]=1;
+                        q.push(list_of_neighbors[w][e]);
                     }
                 }
             }

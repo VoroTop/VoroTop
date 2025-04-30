@@ -97,14 +97,6 @@ void help_message(void) {
 ////
 ////////////////////////////////////////////////////
 
-const int DEFAULT_MAX_RADIUS = 20;
-
-void validate_max_radius(int max_radius) {
-    if (max_radius < 1 || max_radius > 127) {
-        throw std::runtime_error("Invalid max_radius: " + std::to_string(max_radius) + ". It must be between 1 and 127.");
-    }
-}
-
 void parse_command_line_options(int argc, char *argv[])
 {
     if(argc<2)
@@ -139,7 +131,8 @@ void parse_command_line_options(int argc, char *argv[])
 
     // FOR EPS COLORING SCHEME
     particle_coloring_scheme = -1;
-    
+    const int DEFAULT_MAX_RADIUS = 20;
+
     // FIRST ARGUMENT (d=1) IS INPUT DATA FILENAME; PARSE REMAINING ARGUMENTS.
     for(int d=2; d<argc; d++)
     {
@@ -260,7 +253,8 @@ void parse_command_line_options(int argc, char *argv[])
         else if(strcmp(argv[d],"-e")==0)                   // OUTPUT EPS FILE; TAKES 0, 1, OR 2 ARGUMENTS.
         {                                                  // 0 ARGUMENTS: DEFAULT COLOR SCHEME, DRAW ENTIRE SYSTEM
             e_switch=1;                                    // 1 ARGUMENT : COLOR SCHEME, DRAW ENTIRE SYSTEM
-            if(argc > d+1 && argv[d+1][0]!='-')            // 2 ARGUMENTS: COLOR SCHEME, DRAW GIVEN NUMBER OF PARTICLES
+                                                           // 2 ARGUMENTS: COLOR SCHEME, DRAW GIVEN NUMBER OF PARTICLES
+            if(argc > d+1 && argv[d+1][0]!='-')            
             {
                 particle_coloring_scheme = atoi(argv[d+1]);     // FIRST OPTIONAL ARGUMENT GIVES COLOR SCHEME
                 
@@ -268,8 +262,9 @@ void parse_command_line_options(int argc, char *argv[])
                 {
                     particles_in_eps = atoi(argv[d+2]);
                     d++;
-                }
-                
+                }                
+                else particles_in_eps=0;                   // DRAW ALL PARTICLES
+
                 d++;
             }
             else                                           // NO ARGUMENTS
@@ -310,12 +305,19 @@ void parse_command_line_options(int argc, char *argv[])
         }
     }
         
-    
-    // CHECK COMBINATIONS OF OPTIONS
+
+    // CHECK COMPATIBILITY OF OPTIONS
     if(e_switch && dimension==3)
     {
-        std::cout << "-e option not compatible with 3D systems; use -2 option to specify 2D system.\n";
+        std::cout << "-e option not compatible with 3D systems; use -2 option to specify treating system as 2D.\n";
         exit(0);
+    }
+
+    if(e_switch && f_switch==1 && particle_coloring_scheme!=3)
+    {   
+        particle_coloring_scheme = 3; // COLORING SCHEME 3 REQUIRES CLASSIFYING PARTICLES USING FILTER
+        std::cout << "-e option not compatible with -f option unless coloring scheme is 3.\n";
+        std::cout << "Changing coloring scheme to 3.\n";
     }
 
     if(r_switch && !f_switch)

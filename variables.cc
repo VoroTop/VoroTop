@@ -33,14 +33,11 @@ bool v_switch;    // COMPUTE VORONOI PAIR CORRELATION FUNCTION
 bool vt_switch;   // OUTPUT VORONOI TOPOLOGY FOR EACH PARTICLE, EITHER AS P- OR W-VECTOR
 bool r_switch;    // RESOLVE INDETERMINATE TYPES
 
-double hi_bound[3];
-double origin[3];
-double supercell_edges[3][3];
-double xlo_bound, xhi_bound, xy;
-double ylo_bound, yhi_bound, xz;
-double zlo_bound, zhi_bound, yz;
-double perturbation_size;
+double xlo, xhi, xy;
+double ylo, yhi, xz;
+double zlo, zhi, yz;
 bool   scaled_coordinates;
+bool   triclinic_crystal_system;
 
 int threads;
 int number_of_particles;
@@ -52,6 +49,7 @@ int max_radius;
 int particle_coloring_scheme;
 int particles_in_eps;
 int perturbation_samples;
+double perturbation_size;
 
 int header_lines;
 int particle_attributes;
@@ -73,7 +71,7 @@ std::vector<int> cluster_sizes;
 std::vector<int> ring_index;
 
 std::vector<int> cell_neighbor_count;
-std::vector<std::vector <int> > neighbors_list_char;
+std::vector<std::vector <int> > list_of_neighbors;
 
 std::vector<int> vt_structure_types;
 std::vector<int> vt_structure_types_resolved;

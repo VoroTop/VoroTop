@@ -73,8 +73,8 @@ int main(int argc, char *argv[])
     data_file.open(filename_data, std::ifstream::in);
     if(!data_file.is_open())
     {
-        help_message();
-        handle_error("Unable to open input file " + filename_data);
+        std::cerr << "Error opening file: " << filename_data << std::endl;
+        exit(0);
     }
     
     
@@ -97,19 +97,21 @@ int main(int argc, char *argv[])
     particle_ids        =new    int[number_of_particles];
     if (!particle_ids) {
         handle_error("Memory allocation for particle_ids failed.");
+        exit(0);
     }
     
     particle_coordinates=new double[number_of_particles*dimension];
     if (!particle_coordinates) {
         handle_error("Memory allocation for particle_coordinates failed.");
+        exit(0);
     }
 
     vt_structure_types.resize          (number_of_particles);  // MEMORY FOR STRUCTURE TYPES
 
     if(dimension==2 || u_switch || v_switch || c_switch)
     {
-        neighbors_list_char.resize         (number_of_particles);  // MEMORY FOR LIST OF NEIGHBORS
-        cell_neighbor_count.resize         (number_of_particles);
+        list_of_neighbors.resize   (number_of_particles);  // MEMORY FOR LIST OF NEIGHBORS
+        cell_neighbor_count.resize (number_of_particles);
     }
     
     if(c_switch)                                        // MEMORY FOR CLUSTER ANALYSIS
@@ -153,15 +155,19 @@ int main(int argc, char *argv[])
 
     // Dynamically allocate the appropriate container based on the dimension
     if (dimension == 2) {
-        con2d = new voro::container_2d(origin[0], hi_bound[0], origin[1], hi_bound[1], n_x, n_y, true, true, 4, threads);
+        con2d = new voro::container_2d(xlo,xhi,ylo,yhi,n_x,n_y,true,true,4,threads);
         if (!con2d) {
             handle_error("Memory allocation for con2d failed.");
         }
-    } else if (dimension == 3) {
-        con3d = new voro::container_3d(supercell_edges[0][0], supercell_edges[1][0], supercell_edges[1][1],
-                                    supercell_edges[2][0], supercell_edges[2][1], supercell_edges[2][2],
-                                    n_x, n_y, n_z, true, true, true, 8, threads);
     }
+    else    // dimension == 3
+    {
+        con3d = new voro::container_3d(xlo,xhi,ylo,yhi,zlo,zhi,n_x,n_y,n_z,true,true,true,8,threads);
+        if (!con3d) {
+            handle_error("Memory allocation for con3d failed.");
+        }
+    }
+
 
     // Add all particles to the appropriate container
     if (dimension == 2) {
@@ -221,7 +227,7 @@ int main(int argc, char *argv[])
     }
     
     // OUTPUTS LAMMPS DUMP FILE, INCLUDING CLASSIFICATION USING FILTER
-    else if(f_switch)
+    else if(f_switch && !e_switch)
     {
         if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
         else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
@@ -237,9 +243,12 @@ int main(int argc, char *argv[])
     
     else if(e_switch && dimension==2)
     {
-        // COLORING SCHEMES 0,1,2,3 REQUIRE NO ANALYSIS;
+        // COLORING SCHEMES 3 REQUIRES CLASSIFYING PARTICLES USING FILTER
+        if(particle_coloring_scheme == 3) classify_particles_by_voronoi_topology_2d(filter);
+
         // COLORING SCHEME 4 REQUIRES LABELING PARTICLES ACCORDING TO RING NUMBER
         if(particle_coloring_scheme == 4) ring_coloring();
+
         output_eps(*con2d,filename_data);
     }
     

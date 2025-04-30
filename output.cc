@@ -31,6 +31,10 @@ void output_lammps_dump(std::string filename)
 {
     std::string output_file_name = filename + ".dump";
     std::ofstream output_file(output_file_name.c_str(), std::ofstream::out);
+    if (!output_file) {
+        std::cerr << "Error opening file: " << output_file_name << std::endl;
+        return;
+    }
     if (!output_file.is_open()) {
         std::cerr << "Error opening file: " << output_file_name << std::endl;
         return;
@@ -98,7 +102,6 @@ void output_lammps_dump(std::string filename)
 }
 
 
-
 void output_eps(voro::container_2d& con, std::string filename)
 {
     // COLORING SCHEME FOR PARTICLES
@@ -116,7 +119,8 @@ void output_eps(voro::container_2d& con, std::string filename)
     
     // CONSTRUCT COLOR PALETTE BASED ON CHOICE OF
     // PARTICLE COLORING SCHEME
-    std::string color_strings[50];
+    const int max_colors = 256;
+    std::string color_strings[max_colors];
     
     // DO NOT DRAW PARTICLES; NO NEED TO SET PALETTE
     if (particle_coloring_scheme == 0) {}
@@ -128,7 +132,7 @@ void output_eps(voro::container_2d& con, std::string filename)
     else if (particle_coloring_scheme == 2)
     {
         // DEFAULT GREY COLORING
-        for (int j = 0; j < 50; ++j)
+        for (int j = 0; j < max_colors; ++j)
             color_strings[j] = "0.95 0.95 0.95";
         
         // VORONOI CELLS WITH FEWER THAN 4 OR MORE THAN 8 EDGES ARE COLORED GREY
@@ -143,9 +147,8 @@ void output_eps(voro::container_2d& con, std::string filename)
     else if (particle_coloring_scheme == 3)
     {
         // DEFAULT GREY COLORING
-        for (int j = 0; j < 50; ++j)
+        for (int j = 0; j < max_colors; ++j)
             color_strings[j] = "0.95 0.95 0.95";
-        color_strings[0] = "0.961 0.914 0.725"; //#F6EABA LIGHT YELLOW  CRYSTAL
         
         // PARTICLES WITH CLASSIFICATION INDICES GREATER THAN 4 ARE COLORED GREY
         color_strings[1] = "0.961 0.914 0.725"; //#F6EABA YELLOW    CRYSTAL
@@ -171,7 +174,7 @@ void output_eps(voro::container_2d& con, std::string filename)
         color_strings[9] = "0.341 0.600 0.773";
         color_strings[10] = "0.439 0.400 0.678";
         
-        for (int c = 11; c < 50; ++c)                // REPEATS EVERY 10
+        for (int c = 11; c < max_colors; ++c)                // REPEATS EVERY 10
             color_strings[c] = color_strings[(c - 1) % 10 + 1];
     }
     
@@ -183,52 +186,43 @@ void output_eps(voro::container_2d& con, std::string filename)
     
     
     // THERE ARE SEVERAL OBJECTS WHOSE DIMENSIONS WE RECORD IN DIFFERENT UNITS:
-    //  1. ENTIRE SYSTEM, MEASURED IN NATURAL UNITS
+    //  1. ENTIRE SYSTEM, MEASURED IN NATURAL UNITS (ANSTROMS, ETC)
     //  2. REGION TO BE DRAWN, WE CALL THIS THE INNER WINDOW; MIGHT BE ENTIRE
     //     SYSTEM; MEASURED IN NATURAL UNITS.
     //  3. EPS FIGURE, MEASURED IN POINTS, 72 POINTS = 1 INCH
     
     // SYSTEM MEASURED IN NATURAL UNITS GIVEN BY LAMMPS (ANGSTROMS, ETC)
-    double system_width  = hi_bound[0] - origin[0];
-    double system_height = hi_bound[1] - origin[1];
-    
-    // BY DEFAULT WE WILL DRAW THE ENTIRE SYSTEM; BUT IF THE USER CHOOSES TO DRAW
-    // A SMALLER PART OF THE SYSTEM, THEN WE WILL ADJUST THESE WINDOWS ACCORDINGLY.
-    // THIS FEATURE CAN BE USEFUL WHEN CONSIDERING VERY LARGE SYSTEMS.
-    double inner_window_width  = system_width;
-    double inner_window_height = system_height;
+    double system_width  = (xhi-xlo);
+    double system_height = (yhi-ylo);
     
     // IF particles_in_eps WAS NOT SPECIFIED, THEN DRAW ALL PARTICLES.  
     if(particles_in_eps==0) particles_in_eps=number_of_particles;
     
-    // IF DRAWING SUBSYSTEM, THEN THE WINDOW WILL BE A SQUARE WHOSE AREA IS PROPORTIONAL
-    // TO THE NUMBER OF PARTICLES WE WISH TO DRAW.
-    if (particles_in_eps != number_of_particles)
-    {
-        double inner_window_area = double(particles_in_eps) / number_of_particles * system_width * system_height;
-        
-        inner_window_width = sqrt(inner_window_area);
-        inner_window_height = inner_window_width;
-    }
+    // DEFINING INNER WINDOW BOUNDARIES, MEASURED IN NATURAL UNITS
+    double scaling_factor = sqrt(double(particles_in_eps) / number_of_particles);
+    double system_x_min = xlo + (1. - scaling_factor) * system_width / 2.;
+    double system_x_max = xlo + (1. + scaling_factor) * system_width / 2.;
+    double system_y_min = ylo + (1. - scaling_factor) * system_height / 2.;
+    double system_y_max = ylo + (1. + scaling_factor) * system_height / 2.;
+
+    double padding_x = 0.5 * (1.-scaling_factor) * system_width;
+    double padding_y = 0.5 * (1.-scaling_factor) * system_height;
+
     
-    // ALL MEASUREMENTS HERE ARE IN NATURAL UNITS
-    double window_center_x = (origin[0] + hi_bound[0]) / 2.;
-    double window_center_y = (origin[1] + hi_bound[1]) / 2.;
-    
-    double inner_window_origin_x = window_center_x - inner_window_width / 2.;
-    double inner_window_origin_y = window_center_y - inner_window_height / 2.;
-    
-    // FIGURE DIMENSIONS ARE IN EPS UNITS OF POINTS
-    double figure_width = 36. * sqrt(particles_in_eps * inner_window_width / inner_window_height);
-    double figure_height = figure_width * inner_window_height / inner_window_width;
+    // THIS IS SCALING INFORMATION NECESSARY FOR THE EPS FIGURE.
+    // THE EPS FIGURE WILL BE SCALED TO FIT INSIDE A RECTANGLE 
+    // PROPORTIONAL TO THE SIZE OF THE SYSTEM AND TO THE NUMBER 
+    // OF PARTICLES IN THE EPS FIGURE.
+    const double area_per_particle = 1000.;
+    double linear_factor_natural_to_eps = sqrt((double)number_of_particles * area_per_particle/
+                                                 (system_width * system_height));
     
     // SIZE OF PARTICLE RADIUS AND EDGE WIDTH; BOTH ARE IN EPS UNITS OF POINTS
     double particle_radius = 7.2;
     double voronoi_cell_edge_width = particle_radius / 7.2 / 1.5;
     
     // IF NOT DRAWING PARTICLES, THEN MAKE THE VORONOI CELL EDGES THICKER
-    if (particle_coloring_scheme == 0) voronoi_cell_edge_width *= 1.5;
-    
+    if (particle_coloring_scheme == 0) voronoi_cell_edge_width *= 1.5;  
     
     // OPEN FILE FOR EPS OUTPUT
     std::string output_file_name = filename + ".eps";
@@ -237,13 +231,29 @@ void output_eps(voro::container_2d& con, std::string filename)
         std::cerr << "Error opening file: " << output_file_name << std::endl;
         return;
     }
-    
+
+    double eps_min_x = system_x_min * linear_factor_natural_to_eps;
+    double eps_min_y = system_y_min * linear_factor_natural_to_eps;
+    double eps_max_x = system_x_max * linear_factor_natural_to_eps;
+    double eps_max_y = system_y_max * linear_factor_natural_to_eps;
+
+    double figure_width  = linear_factor_natural_to_eps * system_width;
+    double figure_height = linear_factor_natural_to_eps * system_height;
+
+
+    // IF THE WINDOW IS ONLY MINIMALLY LARGER THAN THE SYSTEM, THEN WE 
+    // DRAW ALL PARTICLES, POSSIBLY MULTIPLE TIMES DUE TO PERIODIC
+    // BOUNDARIES.  THIS IS THE CASE WHEN THE WINDOW BEGINS WITHIN
+    // A PARTICLE_RADIUS OF THE ORIGIN.
+    if(eps_min_x < particle_radius || eps_min_y < particle_radius)
+        particles_in_eps = number_of_particles;
+
     // OUTPUT HEADER
     output_file << "%!PS-Adobe-3.0 EPSF-3.0\n";
     output_file << "%%Creator: VoroTop\n";
     
     // FIGURE WILL ALWAYS GO FROM (0,0) TO (figure_width, figure_height)
-    output_file << "%%BoundingBox: " << 0. << " " << 0. << " " << figure_width << " " << figure_height << "\n";
+    output_file << "%%BoundingBox: " << eps_min_x << " " << eps_min_y << " " << eps_max_x << " " << eps_max_y << "\n";
     
     // DRAW VORONOI CELLS
     if (draw_voronoi_cells == 1)
@@ -260,92 +270,71 @@ void output_eps(voro::container_2d& con, std::string filename)
             {
                 int ijk = cli->ijk, q = cli->q;
                 int pid = con.id[ijk][q];
-                
+
                 // COORDINATES OF CENTRAL PARTICLE FOR THIS VORONOI CELL
                 double x = particle_coordinates[2 * pid];
                 double y = particle_coordinates[2 * pid + 1];
                 
-                // IF DRAWING ONLY A LIMITED PART OF SYSTEM, THEN IGNORE VORONOI CELLS 
-                // OF PARTICLES THAT ARE NOT NEAR THE WINDOW; THIS WILL SAVE DISK SPACE
-                // FOR VERY LARGE SYSTEMS.
-                if (particles_in_eps != number_of_particles)
-                {
-                    if (abs(x - window_center_x) > inner_window_width)  continue;
-                    if (abs(y - window_center_y) > inner_window_height) continue;
-                }
-                
                 int to_draw = 0;
+
+                // DETERMINE IF COPIES OF VORONOI CELL ARE NEEDED
                 int min_xb = 0;
                 int max_xb = 0;
                 int min_yb = 0;
                 int max_yb = 0;
                 
-                if (particles_in_eps == number_of_particles)
-                {
-                    // IN THIS CASE WE KNOW THAT WE NEED TO DRAW THE VORONOI.  THE ONLY
-                    // QUESTION IS HOW MANY TIMES, 1, 2, OR 4, DEPENDING ON WHERE THESE
-                    // CORNERS ARE LOCATED.
-                    to_draw = 1;
-                    
-                    int k = 0;
-                    double corner_x = figure_width * ((x + 0.5 * c.pts[2 * k]) - inner_window_origin_x) / inner_window_width;
-                    double corner_y = figure_height * ((y + 0.5 * c.pts[2 * k + 1]) - inner_window_origin_y) / inner_window_height;
-                    k = c.ed[2 * k];
-                    
-                    if (corner_x < 0) min_xb = -1;
-                    if (corner_y < 0) min_yb = -1;
-                    if (corner_x > figure_width)  max_xb = +1;
-                    if (corner_y > figure_height) max_yb = +1;
+                int k = 0;
 
-                    do {
-                        corner_x = figure_width * ((x + 0.5 * c.pts[2 * k]) - inner_window_origin_x) / inner_window_width;
-                        corner_y = figure_height * ((y + 0.5 * c.pts[2 * k + 1]) - inner_window_origin_y) / inner_window_height;
-                        k = c.ed[2 * k];
-                        
-                        if (corner_x < 0) min_xb = -1;
-                        if (corner_y < 0) min_yb = -1;
-                        if (corner_x > figure_width)  max_xb = +1;
-                        if (corner_y > figure_height) max_yb = +1;
-                    } while (k != 0);
-                }
+                double corner_x = x + 0.5 * c.pts[2 * k];
+                double corner_y = y + 0.5 * c.pts[2 * k + 1];
+                k = c.ed[2 * k];
+
+                if (corner_x > padding_x)              to_draw = 1;
+                if (corner_y > padding_y)              to_draw = 1;
+                if (corner_x < system_x_max-padding_x) to_draw = 1;
+                if (corner_y < system_y_max-padding_y) to_draw = 1;
                 
-                // IF ANY PART OF THE VORONOI CELL IS IN OUR WINDOW THEN WE SHOULD DRAW IT
-                else
-                {
-                    int k = 0;
-                    double corner_x = figure_width * ((x + 0.5 * c.pts[2 * k]) - inner_window_origin_x) / inner_window_width;
-                    double corner_y = figure_height * ((y + 0.5 * c.pts[2 * k + 1]) - inner_window_origin_y) / inner_window_height;
+                if (corner_x < -2.*padding_x)               max_xb = +1;
+                if (corner_y < -2.*padding_y)               max_yb = +1;
+                if (corner_x > system_x_max + 2.*padding_x) min_xb = -1;
+                if (corner_y > system_y_max + 2.*padding_y) min_yb = -1;
+                
+                do {
+                    double corner_x = x + 0.5 * c.pts[2 * k];
+                    double corner_y = y + 0.5 * c.pts[2 * k + 1];
                     k = c.ed[2 * k];
-                    if (0 <= corner_x && corner_x <= figure_width && 0 <= corner_y && corner_y <= figure_height) to_draw = 1;
                     
-                    do {
-                        corner_x = figure_width * ((x + 0.5 * c.pts[2 * k]) - inner_window_origin_x) / inner_window_width;
-                        corner_y = figure_height * ((y + 0.5 * c.pts[2 * k + 1]) - inner_window_origin_y) / inner_window_height;
-                        k = c.ed[2 * k];
-                        if (0 <= corner_x && corner_x <= figure_width && 0 <= corner_y && corner_y <= figure_height) to_draw = 1;
-                    } while (k != 0);
-                }
-                
-                // DO NOT DRAW VORONOI CELLS THAT DO NOT INTERSECT OUR REGION.
-                if (to_draw == 0) continue;
-                
+                    if (corner_x > padding_x)              to_draw = 1;
+                    if (corner_y > padding_y)              to_draw = 1;
+                    if (corner_x < system_x_max-padding_x) to_draw = 1;
+                    if (corner_y < system_y_max-padding_y) to_draw = 1;
+                    
+                    if (corner_x < -2.*padding_x)               max_xb = +1;
+                    if (corner_y < -2.*padding_y)               max_yb = +1;
+                    if (corner_x > system_x_max + 2.*padding_x) min_xb = -1;
+                    if (corner_y > system_y_max + 2.*padding_y) min_yb = -1;
+                } while (k != 0);
+            
+                if(to_draw == 0) continue;
 
                 // WHEN THE INNER_WINDOW IS SMALLER THAN THE SYSTEM, WE JUST
                 for (int s = min_xb; s <= max_xb; ++s) for (int t = min_yb; t <= max_yb; ++t)
-                {
+                {                   
                     output_file << "newpath\n";
-                    
+
                     int k = 0;
-                    double corner_x = figure_width * ((x + 0.5 * c.pts[2 * k]) - inner_window_origin_x) / inner_window_width;
-                    double corner_y = figure_height * ((y + 0.5 * c.pts[2 * k + 1]) - inner_window_origin_y) / inner_window_height;
-                    output_file << corner_x - s * figure_width << '\t' << corner_y - t * figure_height << " moveto\n";
+                    double corner_x = x + 0.5 * c.pts[2 * k];
+                    double corner_y = y + 0.5 * c.pts[2 * k + 1];
+                    
+                    output_file << corner_x*linear_factor_natural_to_eps + s*figure_width << '\t' << corner_y*linear_factor_natural_to_eps + t*figure_height << " moveto\n";
                     k = c.ed[2 * k];
                     
                     do {
-                        corner_x = figure_width * ((x + 0.5 * c.pts[2 * k]) - inner_window_origin_x) / inner_window_width;
-                        corner_y = figure_height * ((y + 0.5 * c.pts[2 * k + 1]) - inner_window_origin_y) / inner_window_height;
-                        output_file << corner_x - s * figure_width << '\t' << corner_y - t * figure_height << " lineto\n";
-                        k = c.ed[2 * k];
+                        double corner_x = x + 0.5 * c.pts[2 * k];
+                        double corner_y = y + 0.5 * c.pts[2 * k + 1];
+
+                        output_file << corner_x*linear_factor_natural_to_eps + s*figure_width << '\t' << corner_y*linear_factor_natural_to_eps + t*figure_height << " lineto\n";
+                            k = c.ed[2 * k];
                     } while (k != 0);
                     
                     output_file << "closepath\n";
@@ -370,13 +359,13 @@ void output_eps(voro::container_2d& con, std::string filename)
     
     // DRAW PARTICLES; DOES NOT REQUIRE ITERATING THROUGH CONTAINER
     for (int pid = 0; pid < number_of_particles; ++pid)
-    {
+    {        
         // COORDINATES OF PARTICLES IN NATURAL UNITS
         double x = particle_coordinates[2 * pid];
         double y = particle_coordinates[2 * pid + 1];
         
-        double x_in_eps_units = figure_width * (x - inner_window_origin_x) / inner_window_width;
-        double y_in_eps_units = figure_height * (y - inner_window_origin_y) / inner_window_height;
+        double x_in_eps_units = linear_factor_natural_to_eps * x;
+        double y_in_eps_units = linear_factor_natural_to_eps * y;
         
         int min_xb = 0;
         int max_xb = 0;
@@ -386,10 +375,10 @@ void output_eps(voro::container_2d& con, std::string filename)
         // DO NOT DRAW PARTICLES THAT DO NOT INTERSECT THE INNER WINDOW.
         if (particles_in_eps != number_of_particles)
         {
-            if (x_in_eps_units < -particle_radius)                continue;
-            if (y_in_eps_units < -particle_radius)                continue;
-            if (x_in_eps_units > figure_width + particle_radius) continue;
-            if (y_in_eps_units > figure_height + particle_radius) continue;
+            if (x_in_eps_units < eps_min_x - particle_radius) continue;
+            if (y_in_eps_units < eps_min_y - particle_radius) continue;
+            if (x_in_eps_units > eps_max_x + particle_radius) continue;
+            if (y_in_eps_units > eps_max_y + particle_radius) continue;
         }
         
         // WHEN DRAWING THE ENTIRE SYSTEM WITH PERIODIC BOUNDARY CONDITIONS, THERE MAY
@@ -398,10 +387,10 @@ void output_eps(voro::container_2d& con, std::string filename)
         // SHOULD BE DRAWN FOUR TIMES.
         else
         {
-            if (x_in_eps_units < particle_radius)                 min_xb = -1;
-            if (y_in_eps_units < particle_radius)                 min_yb = -1;
-            if (x_in_eps_units > figure_width - particle_radius) max_xb = +1;
-            if (y_in_eps_units > figure_height - particle_radius) max_yb = +1;
+            if (x_in_eps_units < 2*particle_radius)                 max_xb = +1;
+            if (y_in_eps_units < 2*particle_radius)                 max_yb = +1;
+            if (x_in_eps_units > figure_width  - 2*particle_radius) min_xb = -1;
+            if (y_in_eps_units > figure_height - 2*particle_radius) min_yb = -1;
         }
         
         int voronoi_cell_sides = cell_neighbor_count[pid];
@@ -409,35 +398,38 @@ void output_eps(voro::container_2d& con, std::string filename)
         // IN THIS LOOP EACH PARTICLE IS DRAWN ONCE, TWICE, OR FOUR TIMES
         for (int s = min_xb; s <= max_xb; ++s) for (int t = min_yb; t <= max_yb; ++t)
         {
+            double x = x_in_eps_units + s*figure_width;
+            double y = y_in_eps_units + t*figure_height;
+
             // DRAW PARTICLES ALL IN BLACK
             if (particle_coloring_scheme == 1)
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc fill\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
             
             // COLOR PARTICLES ACCORDING TO NUMBER OF EDGES
             else if (particle_coloring_scheme == 2)
             {
                 output_file << color_strings[voronoi_cell_sides] << " setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc fill\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
                 output_file << "0 0 0 setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc stroke\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
             }
             
             // COLOR PARTICLES ACCORDING TO FILTER INDEXES
             else if (particle_coloring_scheme == 3)
             {
                 output_file << color_strings[vt_structure_types[pid]] << " setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc fill\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
                 output_file << "0 0 0 setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc stroke\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
             }
             
             // COLOR PARTICLES ACCORDING TO VORONOI DISTANCE FROM CENTRAL PARTICLE
             else if (particle_coloring_scheme == 4)
             {
                 output_file << color_strings[ring_index[pid]] << " setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc fill\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
                 output_file << "0 0 0 setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc stroke\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
             }
             
             // COLOR PARTICLES ACCORDING TO CLUSTER ID; CURRENTLY THIS FEATURE IS DESIGNED
@@ -449,9 +441,9 @@ void output_eps(voro::container_2d& con, std::string filename)
                 if (cluster_index[pid] > 0) cluster_index[pid] = 0;
                 else cluster_index[pid] = -cluster_index[pid];
                 output_file << color_strings[cluster_index[pid] % 10 + 1] << " setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc fill\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
                 output_file << "0 0 0 setrgbcolor\n";
-                output_file << x_in_eps_units - s * figure_width << " " << y_in_eps_units - t * figure_height << " " << particle_radius << " 0 360 arc stroke\n";
+                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
             }
             
             else
@@ -481,14 +473,11 @@ void ring_coloring()
     int max_rings = 100;
     
     // DETERMINE PARTICLE CLOSEST TO CENTER OF SYSTEM
-    double closest_distance_squared_to_center = supercell_edges[0][0] + supercell_edges[1][1];
+    double closest_distance_squared_to_center = (xhi-xlo)*(yhi-ylo);
     int closest_particle_ID = 0;
     
-    double system_width = hi_bound[0] - origin[0];
-    double system_height = hi_bound[1] - origin[1];
-
-    double cell_centerx = origin[0] + system_width / 2.;
-    double cell_centery = origin[1] + system_height / 2.;
+    double cell_centerx = (xlo + xhi) / 2.;
+    double cell_centery = (ylo + yhi) / 2.;
     
     for (int c = 0; c < number_of_particles; ++c)
     {
@@ -539,11 +528,11 @@ void ring_coloring()
             // ITERATE OVER ALL ITS NEIGHBORS
             for (int d = 0; d < cell_neighbor_count[tempc]; ++d)
             {
-                if (visited[neighbors_list_char[tempc][d]] == -1)
+                if (visited[list_of_neighbors[tempc][d]] == -1)
                 {
-                    ring_index[neighbors_list_char[tempc][d]] = k;
-                    visited[neighbors_list_char[tempc][d]] = k;
-                    cluster.push_back(neighbors_list_char[tempc][d]);
+                    ring_index[list_of_neighbors[tempc][d]] = k;
+                    visited[list_of_neighbors[tempc][d]] = k;
+                    cluster.push_back(list_of_neighbors[tempc][d]);
                     kneighbors[k]++;
                 }
             }
