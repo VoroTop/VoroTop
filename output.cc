@@ -117,74 +117,6 @@ void output_eps(voro::container_2d& con, std::string filename)
     int draw_voronoi_cells = 1;
     if (n_switch == 1) draw_voronoi_cells = 0;
     
-    // CONSTRUCT COLOR PALETTE BASED ON CHOICE OF
-    // PARTICLE COLORING SCHEME
-    const int max_colors = 256;
-    std::string color_strings[max_colors];
-    
-    // DO NOT DRAW PARTICLES; NO NEED TO SET PALETTE
-    if (particle_coloring_scheme == 0) {}
-    
-    // ALL PARTICLES DRAWN BLACK; NO NEED TO SET PALETTE
-    else if (particle_coloring_scheme == 1) {}
-    
-    // PALETTE FOR COLORING BY EDGE COUNT
-    else if (particle_coloring_scheme == 2)
-    {
-        // DEFAULT GREY COLORING
-        for (int j = 0; j < max_colors; ++j)
-            color_strings[j] = "0.95 0.95 0.95";
-        
-        // VORONOI CELLS WITH FEWER THAN 4 OR MORE THAN 8 EDGES ARE COLORED GREY
-        color_strings[4] = "0.490 0.749 0.580"; //#7DC094
-        color_strings[5] = "0.874 0.506 0.353"; //#E0825A
-        color_strings[6] = "0.961 0.914 0.725"; //#F6EABA
-        color_strings[7] = "0.388 0.608 0.706"; //#639CB5
-        color_strings[8] = "0.757 0.596 0.918"; //#C299EB
-    }
-    
-    // PALETTE FOR COLORING BY FILTER ANALYSIS
-    else if (particle_coloring_scheme == 3)
-    {
-        // DEFAULT GREY COLORING
-        for (int j = 0; j < max_colors; ++j)
-            color_strings[j] = "0.95 0.95 0.95";
-        
-        // PARTICLES WITH CLASSIFICATION INDICES GREATER THAN 4 ARE COLORED GREY
-        color_strings[1] = "0.961 0.914 0.725"; //#F6EABA YELLOW    CRYSTAL
-        color_strings[2] = "0.388 0.608 0.706"; //#639CB5 BLUE      GRAIN BOUNDARY
-        color_strings[3] = "0.874 0.506 0.353"; //#E0825A RED       DISLOCATION
-        color_strings[4] = "0.490 0.749 0.580"; //#7DC094 GREEN     VACANCY
-        color_strings[5] = "0.757 0.596 0.918"; //#C299EB PURPLE    INTERSTITIAL
-    }
-    
-    // PALETTE FOR VORONOI DISTANCES
-    else if (particle_coloring_scheme == 4)
-    {
-        // PALETTE COLORS FOR VORONOI DISTANCES
-        color_strings[0] = "0.700 0.700 0.700"; // CENTRAL PARTICLE
-        color_strings[1] = "0.631 0.173 0.329"; // FIRST NEIGHBORS
-        color_strings[2] = "0.812 0.373 0.396"; // SECOND NEIGHBORS
-        color_strings[3] = "0.914 0.537 0.369"; // ...
-        color_strings[4] = "0.961 0.745 0.498";
-        color_strings[5] = "0.980 0.902 0.647";
-        color_strings[6] = "0.925 0.957 0.694";
-        color_strings[7] = "0.753 0.878 0.718";
-        color_strings[8] = "0.541 0.788 0.710";
-        color_strings[9] = "0.341 0.600 0.773";
-        color_strings[10] = "0.439 0.400 0.678";
-        
-        for (int c = 11; c < max_colors; ++c)                // REPEATS EVERY 10
-            color_strings[c] = color_strings[(c - 1) % 10 + 1];
-    }
-    
-    else
-    {
-        std::cout << "Color palette not chosen for particles\n";
-        exit(0);
-    }
-    
-    
     // THERE ARE SEVERAL OBJECTS WHOSE DIMENSIONS WE RECORD IN DIFFERENT UNITS:
     //  1. ENTIRE SYSTEM, MEASURED IN NATURAL UNITS (ANSTROMS, ETC)
     //  2. REGION TO BE DRAWN, WE CALL THIS THE INNER WINDOW; MIGHT BE ENTIRE
@@ -245,7 +177,7 @@ void output_eps(voro::container_2d& con, std::string filename)
     // DRAW ALL PARTICLES, POSSIBLY MULTIPLE TIMES DUE TO PERIODIC
     // BOUNDARIES.  THIS IS THE CASE WHEN THE WINDOW BEGINS WITHIN
     // A PARTICLE_RADIUS OF THE ORIGIN.
-    if(eps_min_x < particle_radius || eps_min_y < particle_radius)
+    if(padding_x*linear_factor_natural_to_eps < particle_radius || padding_y*linear_factor_natural_to_eps < particle_radius)
         particles_in_eps = number_of_particles;
 
     // OUTPUT HEADER
@@ -254,6 +186,138 @@ void output_eps(voro::container_2d& con, std::string filename)
     
     // FIGURE WILL ALWAYS GO FROM (0,0) TO (figure_width, figure_height)
     output_file << "%%BoundingBox: " << eps_min_x << " " << eps_min_y << " " << eps_max_x << " " << eps_max_y << "\n";
+    
+    // Define a function that draws a polygon given an array of coordinates
+    output_file << "% Define a function that draws a polygon given an array of coordinates\n";
+    output_file << "/polygon {\n";
+    output_file << "  /coords exch def  % Store the coordinate array\n";
+    output_file << "  newpath\n";
+    output_file << "  \n";
+    output_file << "  % First point is moveto\n";
+    output_file << "  coords 0 get coords 1 get moveto\n";
+    output_file << "  \n";
+    output_file << "  % Process remaining points as lineto\n";
+    output_file << "  2 2 coords length 1 sub {\n";
+    output_file << "    /i exch def\n";
+    output_file << "    coords i get coords i 1 add get lineto\n";
+    output_file << "  } for\n";
+    output_file << "  \n";
+    output_file << "  closepath\n";
+    output_file << "  stroke\n";
+    output_file << "} def\n";
+    output_file << "\n";
+
+    // Define constant for circle radius
+    output_file << "/CIRCLE_RADIUS 7.2 def % Constant radius for all circles\n";
+    output_file << "\n";
+    output_file << "% Define color palette (RGB values directly)\n";
+
+    int max_colors = 0;
+
+    if (particle_coloring_scheme == 0) {}
+    else if (particle_coloring_scheme == 1) {}
+    else if (particle_coloring_scheme == 2)
+    {
+        max_colors = 8;
+        output_file << "/colorpalette [\n";
+        output_file << " 0.950 0.950 0.950   % color 0 - UNASSIGNED\n";
+        output_file << " 0.950 0.950 0.950   % color 1 - UNASSIGNED\n";
+        output_file << " 0.950 0.950 0.950   % color 2 - UNASSIGNED\n";
+        output_file << " 0.950 0.950 0.950   % color 3 - UNASSIGNED\n";
+        output_file << " 0.490 0.749 0.580   % color 4 - 4 edges\n";
+        output_file << " 0.874 0.506 0.353   % color 5 - 5 edges\n";
+        output_file << " 0.961 0.914 0.725   % color 6 - 6 edges\n";
+        output_file << " 0.388 0.608 0.706   % color 7 - 7 edges\n";
+        output_file << " 0.757 0.596 0.918   % color 8 - 8 edges\n";
+        output_file << "] def\n";
+    }
+    else if (particle_coloring_scheme == 3)
+    {
+        max_colors = 5;
+        output_file << "/colorpalette [\n";
+        output_file << " 0.950 0.950 0.950   % color 0 - UNASSIGNED\n";
+        output_file << " 0.961 0.914 0.725   % color 1 - CRYSTAL\n";
+        output_file << " 0.388 0.608 0.706   % color 2 - GRAIN BOUNDARY\n";
+        output_file << " 0.874 0.506 0.353   % color 3 - DISLOCATION\n";
+        output_file << " 0.490 0.749 0.580   % color 4 - VACANCY\n";
+        output_file << " 0.757 0.596 0.918   % color 5 - INTERSTITIAL\n";
+        output_file << "] def\n";
+    }
+    else if (particle_coloring_scheme == 4)
+    {
+        output_file << "/colorpalette [\n";
+        output_file << " 0.700 0.700 0.700   % color 0 - CENTRAL PARTICLE\n";
+        output_file << " 0.631 0.173 0.329   % color 1 - FIRST NEIGHBORS\n";
+        output_file << " 0.812 0.373 0.396   % color 2 - SECOND NEIGHBORS\n";
+        output_file << " 0.914 0.537 0.369   % color 3\n";
+        output_file << " 0.961 0.745 0.498   % color 4\n";
+        output_file << " 0.980 0.902 0.647   % color 5\n";
+        output_file << " 0.925 0.957 0.694   % color 6\n";
+        output_file << " 0.753 0.878 0.718   % color 7\n";
+        output_file << " 0.541 0.788 0.710   % color 8\n";
+        output_file << " 0.341 0.600 0.773   % color 9\n";
+        output_file << " 0.439 0.400 0.678   % color 10\n";
+        output_file << "] def\n";
+    }
+    else
+    {
+        std::cout << "Color palette not chosen for particles\n";
+        exit(0);
+    }
+    output_file << "\n";
+
+    if(particle_coloring_scheme == 1)
+    {
+        output_file << "/circle { % x y\n";
+        output_file << "  /y exch def\n";
+        output_file << "  /x exch def\n";
+        output_file << "  0 0 0 setrgbcolor\n";
+        output_file << "  newpath x y CIRCLE_RADIUS 0 360 arc fill\n";
+        output_file << "} def\n";
+    }
+    else
+    {
+        output_file << "% Define functions for drawing filled and stroked circles\n";
+        output_file << "/filledcircle { % x y colorindex\n";
+        output_file << "  /colorindex exch def\n";
+        output_file << "  /y exch def\n";
+        output_file << "  /x exch def\n";
+        output_file << "  \n";
+        output_file << "  % Set color from color palette\n";
+        output_file << "  colorindex 3 mul colorpalette exch get\n";
+        output_file << "  colorindex 3 mul 1 add colorpalette exch get\n";
+        output_file << "  colorindex 3 mul 2 add colorpalette exch get\n";
+        output_file << "  setrgbcolor\n";
+        output_file << "  \n";
+        output_file << "  % Draw filled circle\n";
+        output_file << "  newpath\n";
+        output_file << "  x y CIRCLE_RADIUS 0 360 arc\n";
+        output_file << "  fill\n";
+        output_file << "} def\n";
+        output_file << "\n";
+        output_file << "/strokedcircle { % x y\n";
+        output_file << "  /y exch def\n";
+        output_file << "  /x exch def\n";
+        output_file << "  \n";
+        output_file << "  % Black stroke for all circles\n";
+        output_file << "  0 0 0 setrgbcolor\n";
+        output_file << "  \n";
+        output_file << "  % Draw stroked circle\n";
+        output_file << "  newpath\n";
+        output_file << "  x y CIRCLE_RADIUS 0 360 arc\n";
+        output_file << "  stroke\n";
+        output_file << "} def\n";
+        output_file << "\n";
+        output_file << "% Define a function that draws a filled and stroked circle\n";
+        output_file << "/circle { % x y colorindex\n";
+        output_file << "  3 copy % duplicate all parameters\n";
+        output_file << "  filledcircle % draw filled circle\n";
+        output_file << "  pop % remove colorindex\n";
+        output_file << "  strokedcircle % draw stroked circle\n";
+        output_file << "} def\n";
+    }
+
+    output_file << "\n";
     
     // DRAW VORONOI CELLS
     if (draw_voronoi_cells == 1)
@@ -284,61 +348,34 @@ void output_eps(voro::container_2d& con, std::string filename)
                 int max_yb = 0;
                 
                 int k = 0;
-
-                double corner_x = x + 0.5 * c.pts[2 * k];
-                double corner_y = y + 0.5 * c.pts[2 * k + 1];
-                k = c.ed[2 * k];
-
-                if (corner_x > padding_x)              to_draw = 1;
-                if (corner_y > padding_y)              to_draw = 1;
-                if (corner_x < system_x_max-padding_x) to_draw = 1;
-                if (corner_y < system_y_max-padding_y) to_draw = 1;
-                
-                if (corner_x < -2.*padding_x)               max_xb = +1;
-                if (corner_y < -2.*padding_y)               max_yb = +1;
-                if (corner_x > system_x_max + 2.*padding_x) min_xb = -1;
-                if (corner_y > system_y_max + 2.*padding_y) min_yb = -1;
-                
                 do {
                     double corner_x = x + 0.5 * c.pts[2 * k];
                     double corner_y = y + 0.5 * c.pts[2 * k + 1];
                     k = c.ed[2 * k];
                     
-                    if (corner_x > padding_x)              to_draw = 1;
-                    if (corner_y > padding_y)              to_draw = 1;
-                    if (corner_x < system_x_max-padding_x) to_draw = 1;
-                    if (corner_y < system_y_max-padding_y) to_draw = 1;
-                    
-                    if (corner_x < -2.*padding_x)               max_xb = +1;
-                    if (corner_y < -2.*padding_y)               max_yb = +1;
-                    if (corner_x > system_x_max + 2.*padding_x) min_xb = -1;
-                    if (corner_y > system_y_max + 2.*padding_y) min_yb = -1;
+                    if (corner_x > system_x_min && corner_y > system_y_min && corner_x < system_x_max && corner_y < system_y_max) to_draw = 1;
+                
+                    if (corner_x < system_x_min) max_xb = +1;
+                    if (corner_y < system_y_min) max_yb = +1;
+                    if (corner_x > system_x_max) min_xb = -1;
+                    if (corner_y > system_y_max) min_yb = -1;
                 } while (k != 0);
-            
+
                 if(to_draw == 0) continue;
 
-                // WHEN THE INNER_WINDOW IS SMALLER THAN THE SYSTEM, WE JUST
                 for (int s = min_xb; s <= max_xb; ++s) for (int t = min_yb; t <= max_yb; ++t)
                 {                   
-                    output_file << "newpath\n";
+                    output_file << "[";
 
                     int k = 0;
-                    double corner_x = x + 0.5 * c.pts[2 * k];
-                    double corner_y = y + 0.5 * c.pts[2 * k + 1];
-                    
-                    output_file << corner_x*linear_factor_natural_to_eps + s*figure_width << '\t' << corner_y*linear_factor_natural_to_eps + t*figure_height << " moveto\n";
-                    k = c.ed[2 * k];
-                    
                     do {
                         double corner_x = x + 0.5 * c.pts[2 * k];
                         double corner_y = y + 0.5 * c.pts[2 * k + 1];
-
-                        output_file << corner_x*linear_factor_natural_to_eps + s*figure_width << '\t' << corner_y*linear_factor_natural_to_eps + t*figure_height << " lineto\n";
+                        output_file << corner_x*linear_factor_natural_to_eps + s*figure_width << " " << corner_y*linear_factor_natural_to_eps + t*figure_height << " ";
                             k = c.ed[2 * k];
                     } while (k != 0);
                     
-                    output_file << "closepath\n";
-                    output_file << "stroke\n";
+                    output_file << "] polygon\n";
                 }
             }
             else
@@ -371,7 +408,7 @@ void output_eps(voro::container_2d& con, std::string filename)
         int max_xb = 0;
         int min_yb = 0;
         int max_yb = 0;
-        
+
         // DO NOT DRAW PARTICLES THAT DO NOT INTERSECT THE INNER WINDOW.
         if (particles_in_eps != number_of_particles)
         {
@@ -387,10 +424,10 @@ void output_eps(voro::container_2d& con, std::string filename)
         // SHOULD BE DRAWN FOUR TIMES.
         else
         {
-            if (x_in_eps_units < 2*particle_radius)                 max_xb = +1;
-            if (y_in_eps_units < 2*particle_radius)                 max_yb = +1;
-            if (x_in_eps_units > figure_width  - 2*particle_radius) min_xb = -1;
-            if (y_in_eps_units > figure_height - 2*particle_radius) min_yb = -1;
+            if (x_in_eps_units < eps_min_x + particle_radius) max_xb = +1;
+            if (y_in_eps_units < eps_min_y + particle_radius) max_yb = +1;
+            if (x_in_eps_units > eps_max_x - particle_radius) min_xb = -1;
+            if (y_in_eps_units > eps_max_y - particle_radius) min_yb = -1;
         }
         
         int voronoi_cell_sides = cell_neighbor_count[pid];
@@ -403,34 +440,25 @@ void output_eps(voro::container_2d& con, std::string filename)
 
             // DRAW PARTICLES ALL IN BLACK
             if (particle_coloring_scheme == 1)
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
+                output_file << x << " " << y << " circle\n";   
             
             // COLOR PARTICLES ACCORDING TO NUMBER OF EDGES
             else if (particle_coloring_scheme == 2)
             {
-                output_file << color_strings[voronoi_cell_sides] << " setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
-                output_file << "0 0 0 setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
+                if(voronoi_cell_sides<=max_colors) output_file << x << " " << y << " " << voronoi_cell_sides << " circle\n";   
+                else                               output_file << x << " " << y << " " << 0                  << " circle\n";   
             }
             
             // COLOR PARTICLES ACCORDING TO FILTER INDEXES
             else if (particle_coloring_scheme == 3)
             {
-                output_file << color_strings[vt_structure_types[pid]] << " setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
-                output_file << "0 0 0 setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
+                if(vt_structure_types[pid]<=max_colors) output_file << x << " " << y << " " << vt_structure_types[pid] << " circle\n";   
+                else                                    output_file << x << " " << y << " " << 0                       << " circle\n";
             }
             
             // COLOR PARTICLES ACCORDING TO VORONOI DISTANCE FROM CENTRAL PARTICLE
             else if (particle_coloring_scheme == 4)
-            {
-                output_file << color_strings[ring_index[pid]] << " setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
-                output_file << "0 0 0 setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
-            }
+                output_file << x << " " << y << " " << (ring_index[pid]-1)%10 + 1 << " circle\n";
             
             // COLOR PARTICLES ACCORDING TO CLUSTER ID; CURRENTLY THIS FEATURE IS DESIGNED
             // FOR PRIMARILY CRYSTALLINE SYSTEMS, AND SO INDEXES OF CLUSTERS ARE NEGATIVE.
@@ -438,12 +466,9 @@ void output_eps(voro::container_2d& con, std::string filename)
             // CLUSTERS ARE PRIMARILY CRYSTALLINE, AND HENCE HAVE POSITIVE INDEXES.
             else if (particle_coloring_scheme == 5)
             {
-                if (cluster_index[pid] > 0) cluster_index[pid] = 0;
-                else cluster_index[pid] = -cluster_index[pid];
-                output_file << color_strings[cluster_index[pid] % 10 + 1] << " setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc fill\n";
-                output_file << "0 0 0 setrgbcolor\n";
-                output_file << x << " " << y << " " << particle_radius << " 0 360 arc stroke\n";
+                if  (cluster_index[pid] > 0) cluster_index[pid] = 0;
+                else cluster_index[pid] =   -cluster_index[pid];
+                output_file << x << " " << y << " " << cluster_index[pid] % 10 + 1 << " circle\n";
             }
             
             else
