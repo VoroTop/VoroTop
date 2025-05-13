@@ -53,7 +53,8 @@ void help_message(void) {
     "                                                                                 \n"
     "Available options:                                                               \n"
     "                                                                                 \n"
-    " -2    : Specify that the system is two-dimensional.                             \n"
+    " -2    : Specify that the system is two-dimensional.  If not specified, it is    \n"
+    "         treated as three-dimensional.                                           \n"
     "                                                                                 \n"
     " -vt   : Compute topology of each particle, save to <filename>.vectors.          \n"
     " -d    : Compute distribution of Voronoi topologies, represented as either       \n"
@@ -131,14 +132,17 @@ void parse_command_line_options(int argc, char *argv[])
 
     // FOR EPS COLORING SCHEME
     particle_coloring_scheme = -1;
+    n_switch = 0;   // SWITCH USED FOR TURNING OFF DRAWING OF VORONOI CELLS
+
+    // DEFAULT VALUE FOR PAIR CORRELATION FUNCTIONS
     const int DEFAULT_MAX_RADIUS = 20;
 
     // FIRST ARGUMENT (d=1) IS INPUT DATA FILENAME; PARSE REMAINING ARGUMENTS.
     for(int d=2; d<argc; d++)
     {
         if     (strcmp(argv[d],"-2")  ==0) dimension=2;    // SPECIFY FOR 2-DIMENSIONAL SYSTEMS
-        else if(strcmp(argv[d],"-vt") ==0) vt_switch=1;    // PRINT OUT W-VECTORS FOR EACH PARTICLE
-        else if(strcmp(argv[d],"-d")  ==0)  d_switch=1;    // PRINT OUT DISTRIBUTION OF W-VECTORS OF SYSTEM
+        else if(strcmp(argv[d],"-vt") ==0) vt_switch=1;    // PRINT OUT P-VECTORS OR W-VECTORS FOR EACH PARTICLE IN 2 AND 3 DIMENSIONS
+        else if(strcmp(argv[d],"-d")  ==0)  d_switch=1;    // PRINT OUT DISTRIBUTION OF VORONOI TOPOLOGIES
 
         // COMPUTE DISTRIBUTION FOR PERTURBATIONS OF A GIVEN SYSTEM
         else if(strcmp(argv[d],"-g")==0)
@@ -158,9 +162,9 @@ void parse_command_line_options(int argc, char *argv[])
                 std::cout << "-g option indicated; must be followed by two numbers, samples and perturbation.\n";
                 exit(0);
             }
-            else  // AT THIS POINT WE HAVE TWO OBJECTS FOLLOWING.  WE DETERMINE THESE VALUES
-                  // AND MAKE SURE THAT THEY ARE VALUES BETWEEN 0 AND 1; IF THEY ARE WE USE
-                  // THEM, OTHERWISE WE RETURN AN ERROR MESSAGE.
+            else  // WE READ IN THE TWO PARAMETERS FOLLOWING.  WE MAKE SURE THAT perturbation_samples IS AT 
+                  // LEAST 1, AND MAKE SURE THAT perturbation_size >= 0.  IF THESE CONDITIONS ARE MET, THEN 
+                  // WE USE THESE VALUES.  IF NOT, WE RETURN AN ERROR MESSAGE.                  
             {
                 g_switch=1;
                 
@@ -179,7 +183,8 @@ void parse_command_line_options(int argc, char *argv[])
             }
         }
         
-        else if(strcmp(argv[d],"-f")==0)                        // SPECIFY FILTER FILE
+        // SPECIFY FILTER FILE
+        else if(strcmp(argv[d],"-f")==0)                    
         {
             if(argc > d+1 && argv[d+1][0]!='-')
             {
@@ -196,7 +201,9 @@ void parse_command_line_options(int argc, char *argv[])
             }
         }
 
-        else if(strcmp(argv[d],"-u")==0)                   // OUTPUT UNNORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
+        // COMPUTE AND OUTPUT UNNORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
+        // TAKES OPTIONAL ARGUMENT TO DETERMINE MAXIMAL RADIUS.
+        else if(strcmp(argv[d],"-u")==0)                   
         {        
             // TAKES OPTIONAL ARGUMENT TO DETERMINE MAXIMAL RADIUS.
             u_switch = 1;
@@ -209,8 +216,10 @@ void parse_command_line_options(int argc, char *argv[])
                 max_radius = DEFAULT_MAX_RADIUS;
         }
 
-        else if(strcmp(argv[d],"-v")==0)                   // OUTPUT NORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
-        {                                                  // TAKES OPTIONAL ARGUMENT TO DETERMINE MAXIMAL RADIUS.
+        // COMPUTE AND OUTPUT NORMALIZED VORONOI PAIR CORRELATION FUNCTION DATA
+        // TAKES OPTIONAL ARGUMENT TO DETERMINE MAXIMAL RADIUS.
+        else if(strcmp(argv[d],"-v")==0)                   
+        {                                                  
             v_switch = 1;
             if(argc > d+1 && argv[d+1][0]!='-')
             {
@@ -221,10 +230,12 @@ void parse_command_line_options(int argc, char *argv[])
                 max_radius = DEFAULT_MAX_RADIUS;
         }
         
-        else if(strcmp(argv[d],"-r") ==0)                // RESOLVE INDETERMINATE TYPES
+        // RESOLVE INDETERMINATE TYPES
+        else if(strcmp(argv[d],"-r") ==0)                
             r_switch=1;
         
-        else if(strcmp(argv[d],"-c") ==0)                  // CLUSTER ANALYSIS; TAKES OPTIONAL ARGUMENT
+        // CLUSTER ANALYSIS; TAKES OPTIONAL ARGUMENT
+        else if(strcmp(argv[d],"-c") ==0)                  
         {
             c_switch=1;
             if(argc > d+1 && argv[d+1][0]!='-')
@@ -247,16 +258,17 @@ void parse_command_line_options(int argc, char *argv[])
             }
         }
        
-        // THIS SHOULD TAKE 0, 1, OR 2 ARGUMENTS.  IF 0, THEN DEFFAULT COLORING.  IF 1, THEN COLOR SCHEME
-        // AND DRAW ENTIRE SYSTEM.  IF 2, THEN COLOR SCHEME AND DRAW THAT NUMBER OF PARTICLES.
-        
-        else if(strcmp(argv[d],"-e")==0)                   // OUTPUT EPS FILE; TAKES 0, 1, OR 2 ARGUMENTS.
-        {                                                  // 0 ARGUMENTS: DEFAULT COLOR SCHEME, DRAW ENTIRE SYSTEM
-            e_switch=1;                                    // 1 ARGUMENT : COLOR SCHEME, DRAW ENTIRE SYSTEM
-                                                           // 2 ARGUMENTS: COLOR SCHEME, DRAW GIVEN NUMBER OF PARTICLES
+        // OUTPUT EPS FILE; TAKES 0, 1, OR 2 ARGUMENTS.  IF NO ARGUMENTS FOLLOW, THEN DRAW ALL PARTICLES 
+        // WITH DEFAULT COLORING ACCORDING TO NUMBER OF EDGES.  IF ONE ARGUMENT FOLLOWS, THEN DRAW ALL 
+        // PARTICLES WITH THAT COLORING SCHEME. IF 2 ARGUMENTS FOLLOW, THEN THE FIRST CHOOSES THE COLOR 
+        // SCHEME AND THE SECOND SPECIFIES THE ROUGH NUMBER OF PARTICLES DRAWN.
+        else if(strcmp(argv[d],"-e")==0)                   
+        {                                                 
+            e_switch=1;                                    
+                                                          
             if(argc > d+1 && argv[d+1][0]!='-')            
             {
-                particle_coloring_scheme = atoi(argv[d+1]);     // FIRST OPTIONAL ARGUMENT GIVES COLOR SCHEME
+                particle_coloring_scheme = atoi(argv[d+1]);  // FIRST OPTIONAL ARGUMENT GIVES COLOR SCHEME
                 
                 if(argc > d+2 && argv[d+2][0]!='-')        // SECOND ARGUMENT, DETERMINES NUMBER OF PARTICLES
                 {
@@ -282,21 +294,26 @@ void parse_command_line_options(int argc, char *argv[])
                 exit(0);
             }
         }
-        else if(strcmp(argv[d],"-n") ==0)  n_switch=1;     // DO NOT DRAW VORONOI CELLS; ONLY DRAW PARTICLES
 
-        else if(strcmp(argv[d],"-t") ==0)                  // SPECIFIC NUMBER OF THREADS FOR MULTITHREADED VERSION
+        // DO NOT DRAW VORONOI CELLS, ONLY PARTICLES
+        else if(strcmp(argv[d],"-n") ==0)  n_switch=1;     
+
+        // SPECIFIC NUMBER OF THREADS FOR MULTITHREADED VERSION
+        else if(strcmp(argv[d],"-t") ==0)                  
         {
             if(argc > d+1 && argv[d+1][0]!='-')
                 threads = atoi(argv[d+1]);
             d++;
         }
  
+        // OUTPUT HELP MESSAGE
         else if(strcmp(argv[d],"-h")==0 || strcmp(argv[d],"-help")==0) 
         {
             help_message();
             exit(0);
         }
 
+        // UNIDENTIFIED OPTION
         else
         {
             help_message();

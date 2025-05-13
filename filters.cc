@@ -113,7 +113,7 @@ void Filter::load_filter()
             
             auto it = entries.find(new_vector);
             if (it != entries.end()) it->second.structure_types.push_back(structure_type);
-            else entries.insert({std::move(new_vector), FilterEntry(structure_type)});
+            else entries.emplace(std::move(new_vector), FilterEntry(structure_type));
         }
     }
 
@@ -134,8 +134,15 @@ bool compare_by_count_vector(std::map<std::vector<int>,FilterEntry>::iterator a,
 void Filter::increment_or_add(std::vector<int>& topology_vector, int chirality, int count)
 {
     auto it = entries.find(topology_vector);
-    if (it != entries.end()) { it->second.counts[chirality+1] += count; it->second.total += count; }
-    else entries.insert({std::move(topology_vector), FilterEntry(chirality, count)});
+    if (it != entries.end()) 
+    { 
+        it->second.counts[chirality + 1] += count; 
+        it->second.total += count; 
+    } 
+    else 
+    { 
+        entries.emplace(std::move(topology_vector), FilterEntry(chirality, count)); 
+    }
 }
 
 
@@ -207,7 +214,9 @@ void Filter::print_distribution(std::string filename)
 int Filter::count_indeterminate_types()
 {
     int count = 0;
-    for(auto it = entries.begin(); it != entries.end(); ++it) if(it->second.structure_types.size() > 1) count++;
+    for (const auto& entry : entries) 
+        if (entry.second.structure_types.size() > 1) 
+            count++;
     return count;
 }
 
