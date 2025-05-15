@@ -153,6 +153,7 @@ void output_eps(voro::container_2d& con, std::string filename)
     double particle_radius = 7.2;
     double voronoi_cell_edge_width = particle_radius / 7.2 / 1.5;
     
+
     // IF NOT DRAWING PARTICLES, THEN MAKE THE VORONOI CELL EDGES THICKER
     if (particle_coloring_scheme == 0) voronoi_cell_edge_width *= 1.5;  
     
@@ -214,7 +215,7 @@ void output_eps(voro::container_2d& con, std::string filename)
 
     int max_colors = 0;
 
-    if (particle_coloring_scheme == 0) {}
+    if      (particle_coloring_scheme == 0) {}
     else if (particle_coloring_scheme == 1) {}
     else if (particle_coloring_scheme == 2)
     {
@@ -249,6 +250,22 @@ void output_eps(voro::container_2d& con, std::string filename)
         output_file << " 0.700 0.700 0.700   % color 0 - CENTRAL PARTICLE\n";
         output_file << " 0.631 0.173 0.329   % color 1 - FIRST NEIGHBORS\n";
         output_file << " 0.812 0.373 0.396   % color 2 - SECOND NEIGHBORS\n";
+        output_file << " 0.914 0.537 0.369   % color 3\n";
+        output_file << " 0.961 0.745 0.498   % color 4\n";
+        output_file << " 0.980 0.902 0.647   % color 5\n";
+        output_file << " 0.925 0.957 0.694   % color 6\n";
+        output_file << " 0.753 0.878 0.718   % color 7\n";
+        output_file << " 0.541 0.788 0.710   % color 8\n";
+        output_file << " 0.341 0.600 0.773   % color 9\n";
+        output_file << " 0.439 0.400 0.678   % color 10\n";
+        output_file << "] def\n";
+    }
+    else if (particle_coloring_scheme == 5 || particle_coloring_scheme == 6 || particle_coloring_scheme == 7 || particle_coloring_scheme == 8)
+    {
+        output_file << "/colorpalette [\n";
+        output_file << " 0.700 0.700 0.700   % color 0\n";
+        output_file << " 0.631 0.173 0.329   % color 1\n";
+        output_file << " 0.812 0.373 0.396   % color 2\n";
         output_file << " 0.914 0.537 0.369   % color 3\n";
         output_file << " 0.961 0.745 0.498   % color 4\n";
         output_file << " 0.980 0.902 0.647   % color 5\n";
@@ -394,6 +411,7 @@ void output_eps(voro::container_2d& con, std::string filename)
         return;
     }
     
+
     // DRAW PARTICLES; DOES NOT REQUIRE ITERATING THROUGH CONTAINER
     for (int pid = 0; pid < number_of_particles; ++pid)
     {        
@@ -459,18 +477,48 @@ void output_eps(voro::container_2d& con, std::string filename)
             // COLOR PARTICLES ACCORDING TO VORONOI DISTANCE FROM CENTRAL PARTICLE
             else if (particle_coloring_scheme == 4)
                 output_file << x << " " << y << " " << (ring_index[pid]-1)%10 + 1 << " circle\n";
-            
-            // COLOR PARTICLES ACCORDING TO CLUSTER ID; CURRENTLY THIS FEATURE IS DESIGNED
-            // FOR PRIMARILY CRYSTALLINE SYSTEMS, AND SO INDEXES OF CLUSTERS ARE NEGATIVE.
-            // CODE CAN BE ADJUSTED FOR SYSTEMS THAT ARE PRIMARILY DISORDERED, AND IN WHICH
-            // CLUSTERS ARE PRIMARILY CRYSTALLINE, AND HENCE HAVE POSITIVE INDEXES.
+                              
+
+            // COLOR PARTICLES ACCORDING TO DEFECT CLUSTER ID; THIS FEATURE IS DESIGNED
+            // FOR PRIMARILY CRYSTALLINE SYSTEMS
             else if (particle_coloring_scheme == 5)
             {
-                if  (cluster_index[pid] > 0) cluster_index[pid] = 0;
-                else cluster_index[pid] =   -cluster_index[pid];
-                output_file << x << " " << y << " " << cluster_index[pid] % 10 + 1 << " circle\n";
+                int color;
+                if  (cluster_index[pid] > 0) color = 0;
+                else cluster_index[pid] =    color = (-cluster_index[pid]) % 10 +1;;
+                output_file << x << " " << y << " " << color << " circle\n";
             }
             
+            // COLOR PARTICLES ACCORDING TO CRYSTAL CLUSTER ID; THIS FEATURE IS DESIGNED
+            // FOR PRIMARILY DISORDERED SYSTEMS
+            else if (particle_coloring_scheme == 6)
+            {
+                int color;
+                if  (cluster_index[pid] < 0) color = 0;
+                else cluster_index[pid] =    color = cluster_index[pid] % 10 +1;;
+                output_file << x << " " << y << " " << color << " circle\n";
+            }
+
+            // COLOR PARTICLES ACCORDING TO DEFECT CLUSTER SIZE; THIS FEATURE IS DESIGNED
+            // FOR PRIMARILY CRYSTALLINE SYSTEMS
+            else if (particle_coloring_scheme == 7)
+            {
+                int color;
+                if  (cluster_index[pid] > 0) color = 0;
+                else                         color = cluster_sizes[pid] % 10 + 1;
+                output_file << x << " " << y << " " << color << " circle\n";
+            }
+
+            // COLOR PARTICLES ACCORDING TO CRYSTAL CLUSTER SIZE; THIS FEATURE IS DESIGNED
+            // FOR PRIMARILY DISORDERED SYSTEMS
+            else if (particle_coloring_scheme == 8)
+            {
+                int color;
+                if  (cluster_index[pid] < 0) color = 0;
+                else                         color = cluster_sizes[pid] % 10 + 1;
+                output_file << x << " " << y << " " << color << " circle\n";
+            }
+
             else
             {
                 std::cout << "EPS coloring scheme not chosen for particles\n";

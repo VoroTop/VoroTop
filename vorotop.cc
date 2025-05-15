@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
-    vt_structure_types.resize          (number_of_particles);  // MEMORY FOR STRUCTURE TYPES
+    vt_structure_types.resize      (number_of_particles);  // MEMORY FOR STRUCTURE TYPES
 
     if(dimension==2 || u_switch || v_switch || c_switch)
     {
@@ -114,11 +114,10 @@ int main(int argc, char *argv[])
         cell_neighbor_count.resize (number_of_particles);
     }
     
-    if(c_switch)                                        // MEMORY FOR CLUSTER ANALYSIS
+    if(c_switch)                                          // MEMORY FOR CLUSTER ANALYSIS
     {
-        cluster_index.resize   (number_of_particles);
-        cluster_sizes.resize   (number_of_particles);
-        std::fill(cluster_sizes.begin(),cluster_sizes.end(), 0);
+        cluster_index.resize(number_of_particles);
+        cluster_sizes.resize(number_of_particles);
     }
     
     if(particle_coloring_scheme==4)                     // PARTICLE DISTANCE FROM CENTRAL PARTICLE
@@ -134,10 +133,19 @@ int main(int argc, char *argv[])
     ////////////////////////////////////////////////////
     
     if(d_switch==0 && g_switch==0 && vt_switch==0 && c_switch==0 &&
-       f_switch==0 &&  u_switch==0 && v_switch==0 && e_switch==0)
+       l_switch==0 &&  u_switch==0 && v_switch==0 && e_switch==0)
     {
-        help_message();
-        std::cout << "No valid options specified.\n";
+        if(f_switch)
+        {
+            std::cout << "Filter file specified, but no analysis requested.\n";
+            std::cout << "By default will output LAMMPS dump file as if chosen using -l option.\n";
+            l_switch = 1;
+        }
+        else
+        {
+            help_message();
+            std::cout << "No valid options specified.\n";
+        }
     }
         
     
@@ -154,7 +162,8 @@ int main(int argc, char *argv[])
     voro::container_3d* con3d = nullptr;
 
     // Dynamically allocate the appropriate container based on the dimension
-    if (dimension == 2) {
+    if (dimension == 2) 
+    {
         con2d = new voro::container_2d(xlo,xhi,ylo,yhi,n_x,n_y,true,true,4,threads);
         if (!con2d) {
             handle_error("Memory allocation for con2d failed.");
@@ -167,7 +176,6 @@ int main(int argc, char *argv[])
             handle_error("Memory allocation for con3d failed.");
         }
     }
-
 
     // Add all particles to the appropriate container
     if (dimension == 2) {
@@ -201,6 +209,7 @@ int main(int argc, char *argv[])
     ////
     ////////////////////////////////////////////////////
     
+    // THESE CALCULATIONS ARE REQUIRED FOR ALL OPTIONS IN 2-DIMENSIONAL SYSTEMS
     if(dimension==2) count_and_store_neighbors_2d(*con2d);
 
     // OUTPUTS VORONOI TOPOLOGY FOR EACH PARTICLE
@@ -226,22 +235,36 @@ int main(int argc, char *argv[])
         filter.print_distribution(filename_data);
     }
     
-    // OUTPUTS LAMMPS DUMP FILE, INCLUDING CLASSIFICATION USING FILTER
-    else if(f_switch && !e_switch)
-    {
-        if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
-        else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
-        output_lammps_dump(filename_data);
-    }
-    
+    // OUTPUTS PAIR CORRELATION ANALYSIS
     else if(u_switch || v_switch)  
     {
-        if     (dimension==2) count_and_store_neighbors_2d(*con2d);
-        else if(dimension==3) count_and_store_neighbors_3d(*con3d);
+        if(dimension==3) count_and_store_neighbors_3d(*con3d);
         pair_correlation_analysis();
     }
     
-    else if(e_switch && dimension==2)
+    // OUTPUTS CLUSTER ANALYSIS
+    else if(c_switch && !l_switch && !e_switch)
+    {
+        if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
+        else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
+        if(dimension==3) count_and_store_neighbors_3d(*con3d);
+        cluster_analysis();
+    }
+
+    // OUTPUTS LAMMPS DUMP FILE, INCLUDING CLASSIFICATION USING FILTER
+    if(l_switch)
+    {
+        if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
+        else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
+        if(c_switch)
+        {
+            if(dimension==3) count_and_store_neighbors_3d(*con3d);
+            cluster_analysis();
+        }
+        output_lammps_dump(filename_data);
+    }
+    
+    else if(e_switch)
     {
         // COLORING SCHEMES 3 REQUIRES CLASSIFYING PARTICLES USING FILTER
         if(particle_coloring_scheme == 3) classify_particles_by_voronoi_topology_2d(filter);
@@ -249,12 +272,13 @@ int main(int argc, char *argv[])
         // COLORING SCHEME 4 REQUIRES LABELING PARTICLES ACCORDING TO RING NUMBER
         if(particle_coloring_scheme == 4) ring_coloring();
 
+        if(particle_coloring_scheme == 5 || particle_coloring_scheme == 6 || particle_coloring_scheme == 7 || particle_coloring_scheme == 8)
+        {
+            classify_particles_by_voronoi_topology_2d(filter);
+            cluster_analysis();
+        }
+
         output_eps(*con2d,filename_data);
-    }
-    
-    else if(c_switch)
-    {
-        cluster_analysis();
     }
     
     // Clean up dynamically allocated containers

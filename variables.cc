@@ -27,6 +27,7 @@ bool d_switch;    // COMPUTE DISTRIBUTION OF P-VECTORS OR W-VECTORS
 bool e_switch;    // OUTPUT EPS FILE
 bool f_switch;    // LOAD FILTER FILE
 bool g_switch;    // COMPUTE DISTRIBUTION BASED ON PERTURBATIONS OF SYSTEM
+bool l_switch;    // OUTPUT LAMMPS DUMP FILE
 bool n_switch;    // DO NOT DRAW VORONOI CELLS; ONLY DRAW PARTICLES
 bool u_switch;    // COMPUTE UNNORMALIZED VORONOI PAIR CORRELATION FUNCTION
 bool v_switch;    // COMPUTE VORONOI PAIR CORRELATION FUNCTION
@@ -43,8 +44,6 @@ int threads;
 int number_of_particles;
 int n_x,n_y,n_z;
 
-int clustering_default;
-int clustering_default_switch;
 int max_radius;
 int particle_coloring_scheme;
 int particles_in_eps;

@@ -27,6 +27,7 @@ extern bool d_switch;    // COMPUTE DISTRIBUTION OF P-VECTORS OR W-VECTORS
 extern bool e_switch;    // OUTPUT EPS FILE
 extern bool f_switch;    // LOAD FILTER FILE
 extern bool g_switch;    // COMPUTE DISTRIBUTION BASED ON PERTURBATIONS OF SYSTEM
+extern bool l_switch;    // OUTPUT LAMMPS DUMP FILE
 extern bool n_switch;    // DO NOT DRAW VORONOI CELLS; ONLY DRAW PARTICLES
 extern bool u_switch;    // COMPUTE UNNORMALIZED VORONOI PAIR CORRELATION FUNCTION
 extern bool v_switch;    // COMPUTE VORONOI PAIR CORRELATION FUNCTION
@@ -43,8 +44,6 @@ extern int threads;
 extern int number_of_particles;
 extern int n_x,n_y,n_z;
 
-extern int clustering_default;
-extern int clustering_default_switch;
 extern int max_radius;
 extern int particle_coloring_scheme;
 extern int particles_in_eps;

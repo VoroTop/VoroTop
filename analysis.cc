@@ -35,198 +35,6 @@ bool vector_size(const std::vector<int>& a,const std::vector<int>& b)
 
 ////////////////////////////////////////////////////
 ////
-////   DETERMINE "CLUSTERS" OF NON-CRYSTALLINE PARTICLES;
-////   BY DEFAULT, ONLY TYPES NOT APPEARING IN A FILTER
-////   ARE CLASSIFIED AS DEFECTS AND ARE CLUSTERED.  IF
-////   AN OPTIONAL STRUCTURE TYPE IS PROVIDED AT THE COMMAND
-////   LINE THEN ALL PARTICLES WITH OTHER STRUCTURE TYPES ARE
-////   CONSIDERED DEFECTS FOR THIS CLUSTERING PURPOSE.
-////
-////////////////////////////////////////////////////
-
-void cluster_analysis2()
-{
-    int total_defect_particles  = 0;
-    int total_crystal_particles = 0;
-    
-    std::vector <std::vector <int>> clusters_good;
-    std::vector <std::vector <int>> clusters_bad;
-
-    // IF OPTION TO RESOLVE INDETERMINATE TYPES IS USED,
-    // THEN THE RESULTS OF THAT ANALYSIS ARE USED HERE.
-    if(clustering_default_switch == 0)
-    {
-        if(r_switch) for(int c=0; c<number_of_particles; c++) cluster_index[c] = vt_structure_types_resolved[c];
-        else         for(int c=0; c<number_of_particles; c++) cluster_index[c] = vt_structure_types[c];
-    }
-    else
-    {
-        if(r_switch)
-        {
-            for(int c=0; c<number_of_particles; c++)
-            {
-                if(vt_structure_types_resolved[c]==clustering_default)     cluster_index[c] = 1;
-                else                                                       cluster_index[c] = 0;
-            }
-        }
-        else
-        {
-            for(int c=0; c<number_of_particles; c++)
-            {
-                if(vt_structure_types[c]==clustering_default) cluster_index[c] = 1;
-                else                                          cluster_index[c] = 0;
-            }
-        }
-    }
-    
-    // BUILD DEFECT CLUSTERS IN O(N) TIME;
-    std::vector <int> visited(number_of_particles,0);
-    for(int d=0; d<number_of_particles; d++)
-    {
-        if(cluster_index[d]==0) total_defect_particles++;
-        else                    visited[d]=1;
-    }
-    
-    for(int d=0; d<number_of_particles; d++)
-    {
-        if(visited[d]==0)
-        {
-            std::vector<int> cluster;
-            std::queue<int> q;
-            q.push(d);
-            visited[d]=1;
-            
-            while(!q.empty())
-            {
-                int w = q.front();
-                cluster.push_back(w);
-                q.pop();
-                
-                int neighbor_count = cell_neighbor_count[w];
-                for(int e=0; e<neighbor_count; e++)
-                {
-                    if(visited[list_of_neighbors[w][e]]==0)
-                    {
-                        visited[list_of_neighbors[w][e]]=1;
-                        q.push(list_of_neighbors[w][e]);
-                    }
-                }
-            }
-            clusters_bad.push_back(cluster);
-        }
-    }
-    sort(clusters_bad.begin(),clusters_bad.end(),vector_size);
-    
-    // BUILD CRYSTALLINE CLUSTERS IN O(N) TIME;
-    std::fill(visited.begin(),visited.end(), 0);
-    for(int d=0; d<number_of_particles; d++)
-    {
-        if(cluster_index[d]>0)  total_crystal_particles++;
-        else                    visited[d]=1;
-    }
-    
-    for(int d=0; d<number_of_particles; d++)
-    {
-        if(visited[d]==0)
-        {
-            std::vector<int> cluster;
-            std::queue<int> q;
-            q.push(d);
-            visited[d]=1;
-            
-            while(!q.empty())
-            {
-                int w = q.front();
-                cluster.push_back(w);
-                q.pop();
-                
-                int neighbor_count = cell_neighbor_count[w];
-                for(int e=0; e<neighbor_count; e++)
-                {
-                    if(visited[list_of_neighbors[w][e]]==0)
-                    {
-                        visited[list_of_neighbors[w][e]]=1;
-                        q.push(list_of_neighbors[w][e]);
-                    }
-                }
-            }
-            clusters_good.push_back(cluster);
-        }
-    }
-    sort(clusters_good.begin(),clusters_good.end(),vector_size);
-    
-    // ASSIGN AND RECORD FOR EACH PARTICLE A CLUSTER ID. NEGATIVE
-    // INDICES INDICATE DEFECT CLUSTERS; POSITIVE INDICES INDICATE
-    // CRYSTALLINE CLUSTERS. ALSO RECORD FOR EACH PARTICLE THE
-    // NUMBER OF PARTICLES IN ITS CLUSTER.
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
-    {
-        int size = clusters_bad[c].size();
-        for(int d=0; d<size; d++)
-        {
-            cluster_index[clusters_bad[c][d]]=-c-1;
-            cluster_sizes[clusters_bad[c][d]]=size;
-        }
-    }
-    
-    for(unsigned int c=0; c<clusters_good.size(); c++)
-    {
-        int size = clusters_good[c].size();
-        for(int d=0; d<size; d++)
-        {
-            cluster_index[clusters_good[c][d]]=c+1;
-            cluster_sizes[clusters_good[c][d]]=size;
-        }
-    }
-    
-    
-    ////////////////////////////////////////////////////
-    ////
-    ////   OUTPUT BASIC ANALYSIS OF CLUSTERING DATA TO SCREEN
-    ////
-    ////////////////////////////////////////////////////
-    
-    int max_cluster_size = 100;
-    std::vector<int> c_sizes(max_cluster_size,0);
-    double sum_of_squares = 0;
-    
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
-    {
-        int cluster_size = clusters_bad[c].size();
-        if(cluster_size < max_cluster_size)
-            c_sizes[cluster_size]++;
-        sum_of_squares += cluster_size * cluster_size;
-    }
-    
-    std::cout << filename_data          << '\t';
-    std::cout << number_of_particles    << '\t';
-    std::cout << total_defect_particles << '\t';
-    std::cout << clusters_bad.size()    << '\t';
-    std::cout << clusters_good.size()   << '\t';
-    
-    if(!clusters_bad.empty())
-    {
-        double average = double(total_defect_particles)/double(clusters_bad.size());
-        double stdev   = sqrt(double(sum_of_squares)/double(clusters_bad.size()) - average*average);
-        
-        std::cout << (clusters_bad. back()).size() << '\t';  // SIZE OF SMALLEST DEFECT CLUSTER
-        std::cout << (clusters_bad.front()).size() << '\t';  // SIZE OF LARGEST DEFECT CLUSTER
-        std::cout << average                       << '\t';  // AVERAGE SIZE OF CLUSTER
-        std::cout << stdev                         << '\t';  // STANDARD DEVIATION OF CLUSTER SIZE
-    }
-    else
-        std::cout << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\t';
-    
-    for(int c=1; c<max_cluster_size; c++)                    // NUMBER OF CLUSTERS WITH 1, 2, 3, ..., max_cluster_size-1 PARTICLES
-        std::cout << c_sizes[c] << '\t';
-    
-    std::cout << '\n';
-}
-
-
-
-////////////////////////////////////////////////////
-////
 ////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS 
 ////   OF A GIVEN 2D SYSTEM.  USEFUL FOR ANALYZING 
 ////   REALISTIC VERSIONS OF IDEAL SYSTEMS.
@@ -590,26 +398,14 @@ void pair_correlation_analysis2(void)
 
 void cluster_analysis(void)
 {
-    const int DEFAULT_MAX_CLUSTER_SIZE = 100;
-
-    int total_defect_particles  = 0;
     int total_crystal_particles = 0;
+    int total_defect_particles  = 0;
     
-    std::vector <std::vector <int>> clusters_good;
-    std::vector <std::vector <int>> clusters_bad;
+    std::vector <std::vector <int>> clusters_crystalline;
+    std::vector <std::vector <int>> clusters_defect;
     
+    for(int c=0; c<number_of_particles; c++) cluster_index[c] = vt_structure_types[c];
     
-    if(clustering_default_switch == 0)
-        for(int c=0; c<number_of_particles; c++) cluster_index[c] = vt_structure_types[c];
-    
-    else
-    {
-        for(int c=0; c<number_of_particles; c++)
-        {
-            if(vt_structure_types[c]==clustering_default) cluster_index[c] = 1;
-            else                                          cluster_index[c] = 0;
-        }
-    }
     
     // BUILD DEFECT CLUSTERS IN O(N) TIME; FOR USE
     // IN SYSTEMS THAT ARE PRIMARILY CRYSTALLINE.
@@ -645,10 +441,10 @@ void cluster_analysis(void)
                     }
                 }
             }
-            clusters_bad.push_back(cluster);
+            clusters_defect.push_back(cluster);
         }
     }
-    sort(clusters_bad.begin(),clusters_bad.end(),vector_size);
+    sort(clusters_defect.begin(),clusters_defect.end(),vector_size);
     
     
     // BUILD CRYSTALLINE CLUSTERS IN O(N) TIME; FOR USE
@@ -685,10 +481,10 @@ void cluster_analysis(void)
                     }
                 }
             }
-            clusters_good.push_back(cluster);
+            clusters_crystalline.push_back(cluster);
         }
     }
-    sort(clusters_good.begin(),clusters_good.end(),vector_size);
+    sort(clusters_crystalline.begin(),clusters_crystalline.end(),vector_size);
     
     
     ////////////////////////////////////////////////////
@@ -697,25 +493,32 @@ void cluster_analysis(void)
     // POSITIVE INDICES INDICATE CRYSTALLINE CLUSTERS. ALSO RECORD
     // FOR EACH PARTICLE THE NUMBER OF PARTICLES IN ITS CLUSTER,
     // STORED IN cluster_sizes[]
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
+    for(unsigned int c=0; c<clusters_defect.size(); c++)
     {
-        unsigned int size = clusters_bad[c].size();
+        unsigned int size = clusters_defect[c].size();
         for(unsigned int d=0; d<size; d++)
         {
-            cluster_index[clusters_bad[c][d]]=-c-1;
-            cluster_sizes[clusters_bad[c][d]]=size;
+            cluster_index[clusters_defect[c][d]]=-c-1;
+            cluster_sizes[clusters_defect[c][d]]=size;
         }
     }
     
-    for(unsigned int c=0; c<clusters_good.size(); c++)
+    for(unsigned int c=0; c<clusters_crystalline.size(); c++)
     {
-        unsigned int size = clusters_good[c].size();
+        unsigned int size = clusters_crystalline[c].size();
         for(unsigned int d=0; d<size; d++)
         {
-            cluster_index[clusters_good[c][d]]=c+1;
-            cluster_sizes[clusters_good[c][d]]=size;
+            cluster_index[clusters_crystalline[c][d]]=c+1;
+            cluster_sizes[clusters_crystalline[c][d]]=size;
         }
     }
+    
+    // THE PRIMARY CLUSTER ANALYSIS HAS BEEN PERFORMED; IF A LAMMPS 
+    // DUMP FILE IS REQUESTED, OR ELSE IF AN EPS FILE IS REQUESTED, 
+    // THEN WE DO NOT OUTPUT THIS DATA, AND INSTEAD USE IT FOR THE 
+    // LAMMPS DUMP FILE OR EPS FILE.  IF NEITHER OF THESE IS REQUESTED,
+    // THEN WE OUTPUT THE DATA TO THE SCREEN.
+    if(l_switch==1 || e_switch==1) return;
     
     
     ////////////////////////////////////////////////////
@@ -724,40 +527,73 @@ void cluster_analysis(void)
     ////
     ////////////////////////////////////////////////////
     
-    unsigned int max_cluster_size = DEFAULT_MAX_CLUSTER_SIZE;
-    std::vector<int> c_sizes(max_cluster_size,0);
-    double sum_of_squares = 0;
+    double sum_of_squares_defect = 0;    
+    std::map<int, int> clusters_defect_countMap;
+    std::map<int, int> clusters_crystal_countMap;
     
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
+    for(unsigned int c=0; c<clusters_defect.size(); c++)
     {
-        if(clusters_bad[c].size()<max_cluster_size)
-            c_sizes[clusters_bad[c].size()]++;
-        sum_of_squares += clusters_bad[c].size()*clusters_bad[c].size();
+       sum_of_squares_defect += clusters_defect[c].size()*clusters_defect[c].size();
+       clusters_defect_countMap[clusters_defect[c].size()]++;
     }
-    
-    std::cout << filename_data          << '\t';
-    std::cout << number_of_particles    << '\t';
-    std::cout << total_defect_particles << '\t';
-    std::cout << clusters_bad.size()    << '\t';
-    std::cout << clusters_good.size()   << '\t';
-    
-    if(!clusters_bad.empty())
+
+    double sum_of_squares_crystal = 0;    
+    for(unsigned int c=0; c<clusters_crystalline.size(); c++)
     {
-        double average = double(total_defect_particles)/double(clusters_bad.size());
-        double stdev   = sqrt(double(sum_of_squares)/double(clusters_bad.size()) - average*average);
-        
-        std::cout << (clusters_bad. back()).size() << '\t';  // SIZE OF SMALLEST DEFECT CLUSTER
-        std::cout << (clusters_bad.front()).size() << '\t';  // SIZE OF LARGEST DEFECT CLUSTER
-        std::cout << average                       << '\t';  // AVERAGE SIZE OF CLUSTER
-        std::cout << stdev                         << '\t';  // STANDARD DEVIATION OF CLUSTER SIZE
+        sum_of_squares_crystal += clusters_crystalline[c].size()*clusters_crystalline[c].size();
+        clusters_crystal_countMap[clusters_crystalline[c].size()]++;
+    }
+   
+    std::cout << '\n';
+    std::cout << "File:                " << filename_data          << '\n';
+    std::cout << "                     " << '\n';
+    std::cout << "Number of particles: " << number_of_particles    << '\n';
+    std::cout << "Crystal particles:   " << total_crystal_particles << '\n';
+    std::cout << "Crystal clusters:    " << clusters_crystalline.size()   << '\n';
+    std::cout << "Defect particles:    " << total_defect_particles << '\n';
+    std::cout << "Defect clusters:     " << clusters_defect.size()    << '\n';
+    std::cout << "                     " << '\n';
+
+    if(!clusters_crystalline.empty())
+    {
+        std::cout << "Crystalline clusters " << '\n';
+        std::cout << " Average size:       " << (double(total_crystal_particles) / clusters_crystalline.size()) << '\n';
+        std::cout << " Standard deviation: " << sqrt(sum_of_squares_crystal / clusters_crystalline.size() - (total_crystal_particles / clusters_crystalline.size()) * (total_crystal_particles / clusters_crystalline.size())) << '\n';
+        std::cout << " Smallest cluster:   " << (clusters_crystalline.back()).size() << '\n';
+        std::cout << " Largest cluster:    " << (clusters_crystalline.front()).size() << '\n';
+        std::cout << "                     " << '\n';
+
+        std::cout << " Size \t Count " << '\n';
+        std::cout << " ===================" << '\n';
+        for (const auto& pair : clusters_crystal_countMap) {
+            std::cout << " " << pair.first << '\t' << pair.second << '\n';
+        }
+        std::cout << '\n';    
     }
     else
-        std::cout << 0 << '\t' << 0 << '\t' << 0 << '\t' << 0 << '\t';
-    
-    for(unsigned int c=1; c<max_cluster_size; c++)       // NUMBER OF CLUSTERS WITH 1, 2, 3, ..., max_cluster_size-1 PARTICLES
-        std::cout << c_sizes[c] << '\t';
-    
-    std::cout << '\n';
+    {
+        std::cout << "No crystal clusters found." << '\n';
+        std::cout << '\n';
+    }
+        
+    if(!clusters_defect.empty())
+    {
+        std::cout << "Defect clusters      " << '\n';
+        std::cout << " Average size:       " << (double(total_defect_particles) / clusters_defect.size()) << '\n';
+        std::cout << " Standard deviation: " << sqrt(sum_of_squares_defect / clusters_defect.size() - (total_defect_particles / clusters_defect.size()) * (total_defect_particles / clusters_defect.size())) << '\n';
+        std::cout << " Smallest cluster:   " << (clusters_defect.back()).size() << '\n';
+        std::cout << " Largest cluster:    " << (clusters_defect.front()).size() << '\n';
+        std::cout << "                     " << '\n';
+
+        std::cout << " Size \t Count " << '\n';
+        std::cout << " ===================" << '\n';
+        for (const auto& pair : clusters_defect_countMap) {
+            std::cout << " " << pair.first << '\t' << pair.second << '\n';
+        }
+        std::cout << '\n';    
+    }
+    else
+        std::cout << "No defect clusters found." << '\n';
 }
 
 
@@ -776,7 +612,7 @@ void cluster_analysis(void)
 void defect_cluster_analysis(void)  // EXPERIMENTAL
 {
     int total_defect_particles  = 0;
-    std::vector <std::vector <int>> clusters_bad;
+    std::vector <std::vector <int>> clusters_defect;
     
     int typeA_vacancy_count=0;
     int typeB_vacancy_count=0;
@@ -787,20 +623,10 @@ void defect_cluster_analysis(void)  // EXPERIMENTAL
     // IF USING clustering_default_switch FEATURE, THEN WE WANT TO
     // GROUP PARTICULAR KINDS OF DEFECT PARTICLES TOGETHER.  FOR EXAMPLE
     // SIX VACANCY DEFECTS CAN BE COMBINED AS A VACANCY, ETC.
-    if(clustering_default_switch == 0)
-        for(int c=0; c<number_of_particles; c++)
-        {
-            cluster_index[c] = vt_structure_types[c];
-            if(cluster_index[c]==1) cluster_index[c]=0;
-        }
-    
-    else
+    for(int c=0; c<number_of_particles; c++)
     {
-        for(int c=0; c<number_of_particles; c++)
-        {
-            if(vt_structure_types[c]==clustering_default) cluster_index[c] = 1;
-            else                                          cluster_index[c] = 0;
-        }
+        cluster_index[c] = vt_structure_types[c];
+        if(cluster_index[c]==1) cluster_index[c]=0;
     }
     
     // BUILD DEFECT CLUSTERS IN O(N) TIME; FOR USE
@@ -838,39 +664,39 @@ void defect_cluster_analysis(void)  // EXPERIMENTAL
                     }
                 }
             }
-            clusters_bad.push_back(cluster);
+            clusters_defect.push_back(cluster);
         }
     }
-    sort(clusters_bad.begin(),clusters_bad.end(),vector_size);
+    sort(clusters_defect.begin(),clusters_defect.end(),vector_size);
     
-    std::cout << "We have now " << clusters_bad.size() << " defect clusters\n";
+    std::cout << "We have now " << clusters_defect.size() << " defect clusters\n";
     
     
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
+    for(unsigned int c=0; c<clusters_defect.size(); c++)
     {
         bool all_type_3=1;
         bool all_type_4=1;
         bool no_type_2 =1;
         bool no_type_4 =1;
         
-        unsigned int size = clusters_bad[c].size();
+        unsigned int size = clusters_defect[c].size();
         std::cout << "Cluster with " << size << " particles " << '\n';
         for(unsigned int d=0; d<size; d++)
         {
-            if(vt_structure_types[clusters_bad[c][d]]==2) no_type_2 =0;
-            if(vt_structure_types[clusters_bad[c][d]]==4) no_type_4 =0;
-            if(vt_structure_types[clusters_bad[c][d]]!=3) all_type_3=0;
-            if(vt_structure_types[clusters_bad[c][d]]!=4) all_type_4=0;
-            std::cout << clusters_bad[c][d] << '\t' << vt_structure_types[clusters_bad[c][d]] << '\n';
+            if(vt_structure_types[clusters_defect[c][d]]==2) no_type_2 =0;
+            if(vt_structure_types[clusters_defect[c][d]]==4) no_type_4 =0;
+            if(vt_structure_types[clusters_defect[c][d]]!=3) all_type_3=0;
+            if(vt_structure_types[clusters_defect[c][d]]!=4) all_type_4=0;
+            std::cout << clusters_defect[c][d] << '\t' << vt_structure_types[clusters_defect[c][d]] << '\n';
             
-            //            cluster_index[clusters_bad[c][d]]=-c-1;
-            //            cluster_sizes[clusters_bad[c][d]]=size;
+            //            cluster_index[clusters_defect[c][d]]=-c-1;
+            //            cluster_sizes[clusters_defect[c][d]]=size;
         }
         if(size==6 && all_type_4==1) typeA_vacancy_count++;
         if(size==6 && no_type_2 ==1)
         {
             for(unsigned int d=0; d<size; d++)
-                vt_structure_types[clusters_bad[c][d]]=4;
+                vt_structure_types[clusters_defect[c][d]]=4;
             typeB_vacancy_count++;
         }
         if(size==3 && all_type_4==1) typeC_vacancy_count++;
@@ -879,7 +705,7 @@ void defect_cluster_analysis(void)  // EXPERIMENTAL
         if(size>2  && no_type_4 ==1)
         {
             for(unsigned int d=0; d<size; d++)
-                vt_structure_types[clusters_bad[c][d]]=2;
+                vt_structure_types[clusters_defect[c][d]]=2;
             grain_boundary_count++;
         }
         std::cout << '\n';
@@ -891,13 +717,13 @@ void defect_cluster_analysis(void)  // EXPERIMENTAL
     // POSITIVE INDICES INDICATE CRYSTALLINE CLUSTERS. ALSO RECORD
     // FOR EACH PARTICLE THE NUMBER OF PARTICLES IN ITS CLUSTER,
     // STORED IN cluster_sizes[]
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
+    for(unsigned int c=0; c<clusters_defect.size(); c++)
     {
-        unsigned int size = clusters_bad[c].size();
+        unsigned int size = clusters_defect[c].size();
         for(unsigned int d=0; d<size; d++)
         {
-            cluster_index[clusters_bad[c][d]]=-c-1;
-            cluster_sizes[clusters_bad[c][d]]=size;
+            cluster_index[clusters_defect[c][d]]=-c-1;
+            cluster_sizes[clusters_defect[c][d]]=size;
         }
     }
     
@@ -912,25 +738,25 @@ void defect_cluster_analysis(void)  // EXPERIMENTAL
     std::vector<int> c_sizes(max_cluster_size,0);
     double sum_of_squares = 0;
     
-    for(unsigned int c=0; c<clusters_bad.size(); c++)
+    for(unsigned int c=0; c<clusters_defect.size(); c++)
     {
-        if(clusters_bad[c].size()<max_cluster_size)
-            c_sizes[clusters_bad[c].size()]++;
-        sum_of_squares += clusters_bad[c].size()*clusters_bad[c].size();
+        if(clusters_defect[c].size()<max_cluster_size)
+            c_sizes[clusters_defect[c].size()]++;
+        sum_of_squares += clusters_defect[c].size()*clusters_defect[c].size();
     }
     
     std::cout << filename_data          << '\t';
     std::cout << number_of_particles    << '\t';
     std::cout << total_defect_particles << '\t';
-    std::cout << clusters_bad.size()    << '\t';
+    std::cout << clusters_defect.size()    << '\t';
     
-    if(!clusters_bad.empty())
+    if(!clusters_defect.empty())
     {
-        double average = double(total_defect_particles)/double(clusters_bad.size());
-        double stdev   = sqrt(double(sum_of_squares)/double(clusters_bad.size()) - average*average);
+        double average = double(total_defect_particles)/double(clusters_defect.size());
+        double stdev   = sqrt(double(sum_of_squares)/double(clusters_defect.size()) - average*average);
         
-        std::cout << (clusters_bad. back()).size() << '\t';  // SIZE OF SMALLEST DEFECT CLUSTER
-        std::cout << (clusters_bad.front()).size() << '\t';  // SIZE OF LARGEST DEFECT CLUSTER
+        std::cout << (clusters_defect. back()).size() << '\t';  // SIZE OF SMALLEST DEFECT CLUSTER
+        std::cout << (clusters_defect.front()).size() << '\t';  // SIZE OF LARGEST DEFECT CLUSTER
         std::cout << average                       << '\t';  // AVERAGE SIZE OF CLUSTER
         std::cout << stdev                         << '\t';  // STANDARD DEVIATION OF CLUSTER SIZE
     }
