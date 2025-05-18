@@ -15,24 +15,26 @@
 ########################################################
 
 ### Compiler Configuration ###
-CXX      := g++-mp-13
-CXXSTD   := -std=c++11
-CXXFLAGS := -Wall -Wextra -O3 -fopenmp -MMD -MP
-LDFLAGS  := -fopenmp
-LDLIBS   := -lvoro++
+CXX        := g++-mp-13
+CXXSTD     := -std=c++11
+CXXFLAGS   := -Wall -Wextra -O3 -fopenmp -MMD -MP
+LDFLAGS    := -fopenmp
+LDLIBS     := -lvoro++
 
 ### Project Structure ###
-BUILD_DIR := build
-SRC_DIR   := .
-TARGET    := VoroTop
+BUILD_DIR  := build
+SRC_DIR    := .
+TARGET     := VoroTop
+PREFIX     := /usr/local# Default installation prefix
+BIN_DIR    := $(PREFIX)/bin
 
 # Source and object files
-SOURCES   := $(wildcard $(SRC_DIR)/*.cc)
-OBJECTS   := $(patsubst $(SRC_DIR)/%.cc,$(BUILD_DIR)/%.o,$(SOURCES))
-DEPS      := $(OBJECTS:.o=.d)
+SOURCES    := $(wildcard $(SRC_DIR)/*.cc)
+OBJECTS    := $(patsubst $(SRC_DIR)/%.cc,$(BUILD_DIR)/%.o,$(SOURCES))
+DEPS       := $(OBJECTS:.o=.d)
 
 ### Targets ###
-.PHONY: all clean zip
+.PHONY: all clean install
 
 all: $(TARGET)
 
@@ -45,9 +47,13 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cc
 
 -include $(DEPS)
 
-zip:
-	zip -r package.zip *.cc *.hh LICENSE README Makefile
-
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
-	
+
+install: $(TARGET)
+	@echo "Installing $(TARGET) to $(BIN_DIR)"
+	@mkdir -p $(BIN_DIR)
+	@install -m 755 $(TARGET) $(BIN_DIR)/$(TARGET)
+	@echo "$(TARGET) installed successfully!"
+
+
