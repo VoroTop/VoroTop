@@ -1,5 +1,0 @@
-README
-
-*VoroTop* uses the Voro++ library to compute the Voronoi cells and must therefore be installed before *VoroTop*.  Voro++ can be obtained at https://github.com/chr1shr/voro.  For the time being, the dev branch of Voro++ should be used.
-
-Compilation of VoroTop can be performed using the make command in the VoroTop directory.
