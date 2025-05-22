@@ -158,6 +158,13 @@ void pair_correlation_analysis(void)
             normalization[18]=11277.806;
             normalization[19]=12682.522;
             normalization[20]=14172.318;
+            if(max_radius>20)
+            {
+                std::cout << "The normalization constants for Voronoi distances greater than 20 are not yet implemented.\n";
+                std::cout << "Will compute the (normalized) Voronoi pair correlation function only up to Voronoi distance 20.\n";
+                std::cout << "Please use -u for the unnormalized Voronoi pair correlation function, which can be computed for any maximal distance.\n";
+                max_radius=20;
+            }
         }
     }
 

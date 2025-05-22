@@ -6,11 +6,7 @@ We provide here a short hands-on tutorial for learning how to use *VoroTop*. Thr
 
 ### Prerequisites
 
-Before you begin, ensure you have *VoroTop* installed on your system. If you have not already, please refer to the official *VoroTop* installation instructions:
-
-[*(Link to the official VoroTop installation guide here)*]
-
-You will also need a basic understanding of command-line interfaces. 
+Before you begin, ensure you have *VoroTop* installed on your system. If you have not already, please refer to the official *VoroTop* installation instructions in the repo [README.md](../README.md) file.  You will also need a basic understanding of command-line interfaces. 
 
 
 ### Running the Examples
@@ -30,23 +26,23 @@ Here is a brief overview of the ten example problems included in this tutorial:
 **[Example 3: Calculate the distribution of Voronoi topologies](Example03-Distributions/README.md)**
  * Learn how to compute and analyze the distribution of Voronoi topologies in ordered and disordered systems.
 
-**Example 4: Computing the Voronoi pair correlation function**
+**[Example 4: Compute the Voronoi pair correlation function](Example04-PairCorrelations/README.md)**
  * Learn how to compute the Voronoi pair correlation function to understand spatial arrangements of particles in ordered and disordered systems.
 
-**Example 5: Generating EPS files for visualization**
+**Example 5: Generate EPS files for visualization**
  * Learn how to generate encapsulated postscript (EPS) figures of particles and their Voronoi cells in two-dimensional systems for high-quality vector graphics.
 
 **Example 6: Cluster analysis**
  * Learn how to identify and analyze disordered regions in a high-temeprature crystalline systems.
  * Learn how to identify, analyze, and visualize small crystal nuclei two-dimensional liquids.
 
-**Example 7: Creating filters from ideal structures**
+**Example 7: Create filters from ideal structures**
  * Learn how to apply perturbation analyzes of a crystalline structure to identify its associated Voronoi topologies and save them to a filter.
 
-**Example 8: Identifying defects in a crystal using a filter**
+**Example 8: Identify defects in a crystal using a filter**
  * Learn to apply a user-created filter to identify defects in general crystalline systems.
 
-**Example 9: Characterizing grain boundaries using Voronoi analysis**
+**Example 9: Characterize grain boundaries using Voronoi analysis**
  * Learn to apply Voronoi topology analysis to characterize grain boundarys.
 
 **Example 10: Advanced time-dependent analysis (Illustrative)**
