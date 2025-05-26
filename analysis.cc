@@ -268,7 +268,7 @@ void pair_correlation_analysis(void)
 void pair_correlation_analysis2(void)
 {
     // HOW FAR AWAY FROM CENTRAL PARTICLE; DEFAULT
-    // SETTING IS 20; MAX VALUE IS 127.
+    // SETTING IS 10; MAX VALUE IS 127.
     
     // FOR NORMALIZING COUNTS
     std::vector<double>                 normalization     (max_radius+1);

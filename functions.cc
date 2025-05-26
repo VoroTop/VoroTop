@@ -142,7 +142,7 @@ void parse_command_line_options(int argc, char *argv[])
     n_switch = 0;   // SWITCH USED FOR TURNING OFF DRAWING OF VORONOI CELLS
 
     // DEFAULT VALUE FOR PAIR CORRELATION FUNCTIONS
-    const int DEFAULT_MAX_RADIUS = 20;
+    const int DEFAULT_MAX_RADIUS = 10;
 
     // FIRST ARGUMENT (d=1) IS INPUT DATA FILENAME; PARSE REMAINING ARGUMENTS.
     for(int d=2; d<argc; d++)
@@ -221,7 +221,7 @@ void parse_command_line_options(int argc, char *argv[])
                 max_radius = atoi(argv[d+1]);
                 d++;
             }
-            else                                           // DEFAULT VALUE max_radius = 20
+            else                                           // DEFAULT VALUE max_radius = 10
                 max_radius = DEFAULT_MAX_RADIUS;
         }
 
@@ -235,7 +235,7 @@ void parse_command_line_options(int argc, char *argv[])
                 max_radius = atoi(argv[d+1]);
                 d++;
             }
-            else                                           // DEFAULT VALUE max_radius = 20
+            else                                           // DEFAULT VALUE max_radius = 10
                 max_radius = DEFAULT_MAX_RADIUS;
         }
         

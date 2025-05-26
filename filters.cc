@@ -186,6 +186,9 @@ void Filter::print_distribution(std::string filename)
     if(g_switch==1) distribution_file << ", USING " << perturbation_samples << " PERTURBATIONS WITH MAGNITUDE " << perturbation_size;
     distribution_file << '\n';
 
+    if(g_switch==1) distribution_file << "#\tTotal particles sampled: " << number_of_particles*perturbation_samples << '\n';
+    else            distribution_file << "#\tTotal particles sampled: " << number_of_particles << '\n';
+    distribution_file << "#\tTotal Voronoi topologies observed: " << entries.size() << '\n';
     distribution_file << "#\tColumns indicate: Voronoi topology vector, total count, left-handed, non-chiral, and right-handed types\n";
     
     // SORT BY COUNT, THEN BY VORONOI TOPOLOGY VECTOR
