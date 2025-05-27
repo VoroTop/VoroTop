@@ -84,7 +84,7 @@ These foundational examples teach the essential concepts and techniques underlyi
 
 These examples teach essential techniques for visualizing results and identifying structural patterns:
 
-**[Example 5: Generate EPS files for visualization](Example05-EPSVisualization/README.md)**
+**[Example 5: Generate EPS files for visualization](Example05-PostScriptImages/README.md)**
 * **Publication-quality graphics:** Create high-resolution vector graphics for papers and presentations
 * **Multiple coloring schemes:** Highlight different structural features effectively
 * **Visual analysis:** Extract insights through strategic visualization approaches
@@ -200,11 +200,22 @@ This tutorial represents an evolving resource that grows with the *VoroTop* comm
 
 ## Citation and Acknowledgments
 
-If you use *VoroTop* or this tutorial in your research, please cite:
+Further details, theoretical and practical, about Voronoi topology analysis of particle systems can be found in the following papers.  
 
-* Lazar, E.A. "*VoroTop: Voronoi Cell Topology Visualization and Analysis Toolkit*", [Model. Simul. Mater. Sci. Eng. 26:015011](https://iopscience.iop.org/article/10.1088/1361-651X/aa9a01), 2018.
+* Lazar, E.A. "*VoroTop: Voronoi Cell Topology Visualization and Analysis Toolkit*", [arXiv](https://arxiv.org/abs/1804.04221), [Model. Simul. Mater. Sci. Eng. 26:1](https://iopscience.iop.org/article/10.1088/1361-651X/aa9a01), 2017.
 
-* Lazar, E.A., Lu, J., Rycroft, C.H., and Schwarcz, D. "*Characterizing structural features of two-dimensional particle systems through Voronoi topology*", [Model. Simul. Mater. Sci. Eng. 32:085022](https://iopscience.iop.org/article/10.1088/1361-651X/ad8ad9), 2024.
+* Lazar, E.A., Lu, J., Rycroft, C.H., and Schwarcz, D., "*Characterizing structural features of two-dimensional particle systems through Voronoi topology*", [arXiv](https://arxiv.org/abs/2406.00553), [Model. Simul. Mater. Sci. Eng. 32:085022](https://iopscience.iop.org/article/10.1088/1361-651X/ad8ad9), 2024. 
+
+* Lazar, E.A., Han, J. and Srolovitz, D.J. "*A Topological Framework for Local Structure Analysis in Condensed Matter*", [arXiv](https://arxiv.org/abs/1508.05937), [Proc. Natl. Acad. Sci. 112:E5769](https://www.pnas.org/doi/10.1073/pnas.1505788112), 2015.
+
+* Landweber, P.S., Lazar, E.A., Patel, N. "*On fiber diameters of continuous maps*", [arXiv](https://arxiv.org/abs/1503.07597), [Amer. Math. Monthly 123:4](https://www.jstor.org/stable/10.4169/amer.math.monthly.123.4.392), 2016.
+
+* Lazar, E.A., Mason, J.K., MacPherson, R.D. and Srolovitz, D.J. "*Complete topology of cells, grains, and bubbles in three-dimensional microstructures*", [arXiv](https://arxiv.org/abs/1207.5054), [Phys. Rev. Lett. 109:095505](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.109.095505), 2012.
+
+If you use *VoroTop* or this tutorial in your research, please consider citing one or some of these papers.
+
+
+This README was written with assistance from Claude (Anthropic).
 
 ---
 
