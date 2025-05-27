@@ -88,10 +88,13 @@ void Filter::load_filter()
                 is >> resolved_primary;
                 is >> resolved_secondary;
             }
+
+            if(filter_structure_types < max_filter_type_from_file)
+                filter_structure_types = max_filter_type_from_file;
             continue;
         }
         
-        else                         // READ WEINBERG CODES
+        else                         // READ VORONOI TOPOLOGY CODES
         {
             int structure_type;
             is >> structure_type;

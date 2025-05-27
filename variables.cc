@@ -72,5 +72,6 @@ std::vector<int> ring_index;
 std::vector<int> cell_neighbor_count;
 std::vector<std::vector <int> > list_of_neighbors;
 
+int filter_structure_types;
 std::vector<int> vt_structure_types;
 std::vector<int> vt_structure_types_resolved;

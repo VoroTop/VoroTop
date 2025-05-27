@@ -234,15 +234,30 @@ void output_eps(voro::container_2d& con, std::string filename)
     }
     else if (particle_coloring_scheme == 3)
     {
-        max_colors = 5;
-        output_file << "/colorpalette [\n";
-        output_file << " 0.950 0.950 0.950   % color 0 - UNASSIGNED\n";
-        output_file << " 0.961 0.914 0.725   % color 1 - CRYSTAL\n";
-        output_file << " 0.388 0.608 0.706   % color 2 - GRAIN BOUNDARY\n";
-        output_file << " 0.874 0.506 0.353   % color 3 - DISLOCATION\n";
-        output_file << " 0.490 0.749 0.580   % color 4 - VACANCY\n";
-        output_file << " 0.757 0.596 0.918   % color 5 - INTERSTITIAL\n";
-        output_file << "] def\n";
+        // IF FILTER CONTAINS ONLY ONE STRUCTURE TYPE, THEN COLOR IT LIGHT YELLOW 
+        // AND ALL ELSE IN DARK BLUE.
+        if(filter_structure_types == 1)
+        {
+            max_colors = 1;
+            output_file << "/colorpalette [\n";
+            output_file << " 0.388 0.608 0.706   % color 0 - UNASSIGNED\n";
+            output_file << " 0.961 0.914 0.725   % color 1 - CRYSTAL\n";
+            output_file << "] def\n";
+        }
+        
+        else
+        {
+        // IF FILTER HAS MULTIPLE STRUCTURE TYPES, THEN COLOR THEM AS FOLLOWS.
+            max_colors = 5;
+            output_file << "/colorpalette [\n";
+            output_file << " 0.950 0.950 0.950   % color 0 - UNASSIGNED\n";
+            output_file << " 0.961 0.914 0.725   % color 1 - CRYSTAL\n";
+            output_file << " 0.388 0.608 0.706   % color 2 - GRAIN BOUNDARY\n";
+            output_file << " 0.874 0.506 0.353   % color 3 - DISLOCATION\n";
+            output_file << " 0.490 0.749 0.580   % color 4 - VACANCY\n";
+            output_file << " 0.757 0.596 0.918   % color 5 - INTERSTITIAL\n";
+            output_file << "] def\n";
+        }
     }
     else if (particle_coloring_scheme == 4)
     {
@@ -263,7 +278,7 @@ void output_eps(voro::container_2d& con, std::string filename)
     else if (particle_coloring_scheme == 5 || particle_coloring_scheme == 6 || particle_coloring_scheme == 7 || particle_coloring_scheme == 8)
     {
         output_file << "/colorpalette [\n";
-        output_file << " 0.700 0.700 0.700   % color 0\n";
+        output_file << " 0.900 0.900 0.900   % color 0\n";
         output_file << " 0.631 0.173 0.329   % color 1\n";
         output_file << " 0.812 0.373 0.396   % color 2\n";
         output_file << " 0.914 0.537 0.369   % color 3\n";

@@ -72,6 +72,7 @@ extern std::vector<int> ring_index;
 extern std::vector<int> cell_neighbor_count;
 extern std::vector<std::vector <int> > list_of_neighbors;
 
+extern int filter_structure_types;
 extern std::vector<int> vt_structure_types;
 extern std::vector<int> vt_structure_types_resolved;
 

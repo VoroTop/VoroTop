@@ -91,7 +91,7 @@ These examples teach essential techniques for visualizing results and identifyin
 * **Figure preparation:** Professional workflows for scientific communication
 * **Key skills:** Scientific visualization, figure preparation, visual analysis
 
-**[Example 6: Cluster analysis](Example06-ClusterAnalysis/README.md)**
+**Example 6: Cluster analysis**
 * **Multi-particle defects:** Identify extended structural features like grain boundaries and dislocations
 * **Automated grouping:** Systematically organize particles into meaningful structural units
 * **Quantitative characterization:** Measure defect sizes, distributions, and concentrations
@@ -102,28 +102,28 @@ These examples teach essential techniques for visualizing results and identifyin
 
 These examples cover sophisticated analysis methods for research applications and complex materials systems:
 
-**[Example 7: Create filters from ideal structures](Example07-FilterCreation/README.md)**
+**Example 7: Create filters from ideal structures**
 * **Systematic filter generation:** Use perturbation analysis to create comprehensive, robust filters
 * **Theoretical foundation:** Bridge ideal structures and realistic finite-temperature systems
 * **Parameter optimization:** Develop filters tailored to specific materials and conditions
 * **Quality validation:** Ensure filter accuracy and completeness through systematic testing
 * **Key skills:** Filter development, perturbation analysis, systematic methodology
 
-**[Example 8: Identify defects in crystals using filters](Example08-DefectIdentification/README.md)**
+**Example 8: Identify defects in crystals using filters**
 * **Comprehensive defect analysis:** Apply advanced filters to identify and characterize all defect types
 * **Quantitative assessment:** Measure defect concentrations, spatial distributions, and interactions
 * **Materials quality control:** Evaluate crystal perfection and processing effectiveness
 * **Structure-property relationships:** Connect defect populations to material performance
 * **Key skills:** Defect characterization, quality assessment, materials evaluation
 
-**[Example 9: Characterize grain boundaries using Voronoi analysis](Example09-GrainBoundaries/README.md)**
+**Example 9: Characterize grain boundaries using Voronoi analysis**
 * **Interface structure:** Analyze the atomic-scale structure of grain boundaries
 * **Boundary classification:** Distinguish different grain boundary types and characters
 * **Polycrystalline analysis:** Characterize grain size distributions and boundary networks
 * **Processing-structure relationships:** Connect synthesis conditions to final microstructure
 * **Key skills:** Interface analysis, polycrystalline characterization, microstructure analysis
 
-**[Example 10: Advanced time-dependent analysis](Example10-TimeDependent/README.md)**
+**Example 10: Advanced time-dependent analysis**
 * **Dynamic processes:** Track structural evolution during phase transformations, deformation, or growth
 * **Kinetic analysis:** Measure transformation rates and pathway mechanisms
 * **Process optimization:** Identify critical processing parameters affecting final structure
