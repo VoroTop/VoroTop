@@ -110,15 +110,15 @@ The EPS output feature can render both particles and their Voronoi cells with va
     VoroTop Melting2D -2 -c -f crystal_2d.filter -e 5
     VoroTop Crystallizing2D -2 -c -f crystal_2d.filter -e 6
     ```
-  <div style="display: flex; justify-content: space-around; align-items: flex-start; margin: 0 30px;">
+  <div>
 <figure>
-  <img src="melting.png" alt="Grain boundary in finite-temperature crystal">
+  <img src="melting.png" alt="Grain boundary in finite-temperature crystal" width="40%">
   <figcaption>
     A crystal in the process of melting; clusters of non-crystalline atoms are colored.
   </figcaption>
 </figure>
 <figure>
-  <img src="crystallizing.png" alt="Grain boundary in finite-temperature crystal">
+  <img src="crystallizing.png" alt="Grain boundary in finite-temperature crystal" width="40%">
   <figcaption>
     A liquid in the process of crystallizing; clusters of crystalline atoms are colored.
   </figcaption>

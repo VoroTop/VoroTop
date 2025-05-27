@@ -4,7 +4,7 @@
 
 ![VoroTop Logo/Screenshot (Optional)](images/logo.jpg)
 
-VoroTop is a software package designed to perform Voronoi topology analysis of spatial point sets in two and three dimensions, using a complete description of the Voronoi cell topology of each point. It is ideal for researchers and developers working with atomistic data sets, including those created through molecular dynamic simulation. *VoroTop* leverages the robust [`voro++`](https://github.com/chr1shr/voro) library to offer fast and accurate calculations, providing a flexible framework for extracting and analyzing Voronoi cell properties.
+*VoroTop* is a software package designed to perform Voronoi topology analysis of spatial point sets in two and three dimensions, using a complete description of the Voronoi cell topology of each point. It is ideal for researchers and developers working with atomistic data sets, including those created through molecular dynamic simulation. *VoroTop* leverages the robust [`voro++`](https://github.com/chr1shr/voro) library to offer fast and accurate calculations, providing a flexible framework for extracting and analyzing Voronoi cell properties.
 
 
 
@@ -110,6 +110,8 @@ Further details, theoretical and practical, about Voronoi topology analysis of p
 * Worlitzer, V.M., Ariel, G., and Lazar, E.A., "*Pair correlation function based on Voronoi topology*", [arXiv](https://arxiv.org/abs/2210.09731), [Phys. Rev. E 108:064115](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.108.064115), 2023. 
 
 * Landweber, P.S., Lazar, E.A., Patel, N. "*On fiber diameters of continuous maps*", [arXiv](https://arxiv.org/abs/1503.07597), [Amer. Math. Monthly 123:4](https://www.jstor.org/stable/10.4169/amer.math.monthly.123.4.392), 2016.
+
+* Lazar, E.A., Mason, J.K., MacPherson, R.D. and Srolovitz, D.J. "*Complete topology of cells, grains, and bubbles in three-dimensional microstructures*", [arXiv](https://arxiv.org/abs/1207.5054), [Phys. Rev. Lett. 109:095505](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.109.095505), 2012.
 
 ---
 
