@@ -71,7 +71,7 @@ After installing `voro++` from the `dev` branch, follow these steps to compile V
 
 1.  **Clone the VoroTop repository:**
     ```bash
-    git clone https://gitlab.com/mLazar/VoroTop.git
+    git clone https://github.com/VoroTop/VoroTop.git 
     ```
 
 2.  **Navigate into the VoroTop directory:**
