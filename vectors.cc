@@ -313,8 +313,8 @@ void print_topology_vectors_3d(container_3d& con, std::string filename)
             buf[tid] << face_count        << '\t';     // NUMBER OF FACES
             buf[tid] << '(';                           // P VECTOR
             for(int d=3; d<max_face_edges; d++)
-                buf[tid] << result.pvector[d] << ',';
-            buf[tid] << result.pvector[max_face_edges] << ')' << '\t';
+                buf[tid] << result.face_edge_counts[d] << ',';
+            buf[tid] << result.face_edge_counts[max_face_edges] << ')' << '\t';
             
             buf[tid] << '(';                           // WEINBERG VECTOR
             for(int d=0; d<2*edge_count; d++)
@@ -352,7 +352,7 @@ VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
     int face_count         = 0;
     int max_face_edges     = 3;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 3 OR MORE EDGES
     int min_face_edges     = 5;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
-    int pvector[max_epf]   = {};    // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES, NO FACE IN FILTER HAS MORE THAN max_epf-1 EDGES
+    int face_edge_counts[max_epf] = {};  // NUMBER OF FACES WITH EACH NUMBER OF EDGES
     int origins[2*max_epc] = {};    // NO VORONOI CELL IN FILTER HAS MORE THAN max_epc EDGES
     int origin_c           = 0;
 
@@ -366,7 +366,7 @@ VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
         {
             int face_c = fv[pos];   // NUMBER OF EDGES/VERTICES IN THIS FACE
             face_count++;
-            pvector[face_c]++;
+            face_edge_counts[face_c]++;
             if(face_c > max_face_edges)
                 max_face_edges = face_c;
             if(face_c < min_face_edges)
@@ -388,7 +388,7 @@ VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
 
     // KEEPING TRACK OF THIS WILL ALLOW US TO SPEED UP SOME COMPUTATION, OF BCC
     int likely_bcc=0;
-    if(face_count==14 && pvector[4]==6 && pvector[6]==8) likely_bcc=1;   // THIS PVECTOR (0,6,0,8,0,...) OF A SIMPLE POLYHEDRON APPEARS IN 3 DIFFERENT TYPES, WITH SYMMETRIES 4, 8, AND 48
+    if(face_count==14 && face_edge_counts[4]==6 && face_edge_counts[6]==8) likely_bcc=1;   // FACE_EDGE_COUNTS (0,6,0,8,0,...) OF A SIMPLE POLYHEDRON APPEARS IN 3 DIFFERENT TYPES, WITH SYMMETRIES 4, 8, AND 48
     
     
     ////////////////////////////////////////////////////////////////
@@ -535,7 +535,7 @@ VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
     canonical_code.push_back(1);
     return {canonical_code, chirality, symmetry_counter,
             face_count, max_face_edges,
-            std::vector<int>(pvector, pvector + max_epf)};
+            std::vector<int>(face_edge_counts, face_edge_counts + max_epf)};
 }
 
 

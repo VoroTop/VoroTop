@@ -27,7 +27,7 @@ struct VoronoiTopology {
     int symmetry_counter;
     int face_count;
     int max_face_edges;
-    std::vector<int> pvector;
+    std::vector<int> face_edge_counts;  // number of faces with each number of edges
 };
 
 void help_message    (void);
