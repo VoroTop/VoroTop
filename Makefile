@@ -15,7 +15,11 @@
 ########################################################
 
 ### Compiler Configuration ###
-CXX        := g++-mp-13
+# Requires a compiler with OpenMP support (e.g., GCC).
+# macOS users: install GCC via MacPorts or Homebrew, then:
+#   make CXX=g++-mp-15    (MacPorts)
+#   make CXX=g++-14       (Homebrew)
+CXX        := g++
 CXXSTD     := -std=c++11
 CXXFLAGS   := -Wall -Wextra -O3 -fopenmp -MMD -MP
 LDFLAGS    := -fopenmp
@@ -25,7 +29,7 @@ LDLIBS     := -lvoro++
 BUILD_DIR  := build
 SRC_DIR    := .
 TARGET     := VoroTop
-PREFIX     := /usr/local# Default installation prefix
+PREFIX     := /usr/local  # Default installation prefix
 BIN_DIR    := $(PREFIX)/bin
 
 # Source and object files
