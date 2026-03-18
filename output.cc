@@ -219,17 +219,22 @@ void output_eps(voro::container_2d& con, std::string filename)
     else if (particle_coloring_scheme == 1) {}
     else if (particle_coloring_scheme == 2)
     {
-        max_colors = 8;
+        max_colors = 12;
         output_file << "/colorpalette [\n";
-        output_file << " 0.950 0.950 0.950   % color 0 - UNASSIGNED\n";
-        output_file << " 0.950 0.950 0.950   % color 1 - UNASSIGNED\n";
-        output_file << " 0.950 0.950 0.950   % color 2 - UNASSIGNED\n";
-        output_file << " 0.950 0.950 0.950   % color 3 - UNASSIGNED\n";
-        output_file << " 0.490 0.749 0.580   % color 4 - 4 edges\n";
-        output_file << " 0.874 0.506 0.353   % color 5 - 5 edges\n";
-        output_file << " 0.961 0.914 0.725   % color 6 - 6 edges\n";
-        output_file << " 0.388 0.608 0.706   % color 7 - 7 edges\n";
-        output_file << " 0.757 0.596 0.918   % color 8 - 8 edges\n";
+        output_file << " 0.700 0.700 0.700   % color 0 - 0 edges\n";
+        output_file << " 0.700 0.700 0.700   % color 0 - 1 edge \n";
+        output_file << " 0.700 0.700 0.700   % color 0 - 2 edges\n";
+
+        output_file << " 0.631 0.173 0.329   % color 1\n";
+        output_file << " 0.812 0.373 0.396   % color 2\n";
+        output_file << " 0.914 0.537 0.369   % color 3\n";
+        output_file << " 0.980 0.902 0.647   % color 5\n";
+        output_file << " 0.341 0.600 0.773   % color 9\n";
+        output_file << " 0.753 0.878 0.718   % color 7\n";
+        output_file << " 0.439 0.400 0.678   % color 10\n";
+        output_file << " 0.925 0.957 0.694   % color 6\n";
+        output_file << " 0.961 0.745 0.498   % color 4\n";
+        output_file << " 0.541 0.788 0.710   % color 8\n";
         output_file << "] def\n";
     }
     else if (particle_coloring_scheme == 3)
