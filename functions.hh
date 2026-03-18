@@ -19,6 +19,17 @@
 
 #pragma once
 
+#include <vector>
+
+struct VoronoiTopology {
+    std::vector<int> canonical_code;
+    int chirality;
+    int symmetry_counter;
+    int face_count;
+    int max_face_edges;
+    std::vector<int> pvector;
+};
+
 void help_message    (void);
 void parse_command_line_options (int argc, char *argv[]);
 void parse_header    (std::ifstream&);
@@ -50,7 +61,7 @@ void classify_particles_by_voronoi_topology_2d(Filter &filter);
 int  classify_particles_by_voronoi_topology_3d(voro::container_3d& con, Filter &filter);
 
 int  compute_canonical_code_2d(vector<int>& canonical_code, int pid);
-int  compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d& vcell);
+VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell);
 
 void validate_max_radius(int max_radius);
 

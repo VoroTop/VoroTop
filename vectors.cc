@@ -163,11 +163,10 @@ void calc_distribution_3d(container_3d& con, Filter &filter)
         voronoicell_3d vcell;
         if (con.compute_cell(vcell,cli))
         {
-            std::vector<int> canonical_code;                // CANONICAL CODE WILL BE STORED HERE
-            int chirality = compute_canonical_code_3d(canonical_code, vcell);
-            
+            VoronoiTopology result = compute_canonical_code_3d(vcell);
+
             const int tid=omp_get_thread_num();
-            local_filter[tid].increment_or_add(canonical_code,chirality,1);
+            local_filter[tid].increment_or_add(result.canonical_code,result.chirality,1);
         }
     }
     
@@ -298,211 +297,14 @@ void print_topology_vectors_3d(container_3d& con, std::string filename)
             int ijk=cli->ijk,q=cli->q;
             int pid = con.id[ijk][q];
             
-            const int max_epf = 256;    // MAXIMUM EDGES PER FACE
-            const int max_epc = 512;    // MAXIMUM EDGES PER CELL
-            const int max_vpc = 512;    // MAXIMUM VERTICES PER CELL
-            
-            int   edge_count     = vcell.number_of_edges();
-            int   vertex_count   = vcell.p;    // TOTAL NUMBER OF VERTICES
-            int*  vertex_degrees = vcell.nu;   // VERTEX DEGREE ARRAY
-            int** ed             = vcell.ed;   // EDGE CONNECTIONS ARRAY
-            
-            int face_count         = 0;
-            int max_face_edges     = 3;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 3 OR MORE EDGES
-            int min_face_edges     = 5;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
-            int pvector[max_epf]   = {};    // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES, NO FACE IN FILTER HAS MORE THAN max_epf-1 EDGES
-            int origins[2*max_epc] = {};    // NO VORONOI CELL IN FILTER HAS MORE THAN max_epc EDGES
-            int origin_c           = 0;
-            
-            // DETERMINE VERTICES ON FACES WITH MINIMAL EDGES, AND FACES WITH DIFFERENT NUMBERS OF EDGES
-            for(int i=0;i<vertex_count;i++)
-            {
-                for(int j=0;j<vertex_degrees[i];j++)
-                {
-                    int k = ed[i][j];
-                    if(k >= 0)
-                    {
-                        int face[max_epf]={};  // NO SINGLE FACE WILL HAVE MORE THAN max_epf EDGES
-                        int face_c=0;
-                        
-                        ed[i][j]=-1-k;      // INDICATE THAT WE HAVE CHECKED THIS VERTEX
-                        int l=vcell.cycle_up(ed[i][vertex_degrees[i]+j],k);
-                        face[face_c++]=k;
-                        do {
-                            int m=ed[k][l];
-                            ed[k][l]=-1-m;
-                            l=vcell.cycle_up(ed[k][vertex_degrees[k]+l],m);
-                            k=m;
-                            
-                            face[face_c++]=m;
-                        } while (k!=i);
-                        
-                        // KEEP TRACK OF MINIMAL AND MAXIMAL FACE EDGES
-                        if(face_c>max_face_edges)
-                            max_face_edges = face_c;
-                        if(face_c<min_face_edges)
-                        {
-                            min_face_edges = origin_c = face_c;
-                            for(int c=0; c<face_c; c++)
-                                origins[c] = face[c];
-                        }
-                        else if(face_c==min_face_edges)
-                        {
-                            for(int c=0; c<face_c; c++)
-                                origins[origin_c+c] = face[c];
-                            origin_c += face_c;
-                        }
-                        pvector[face_c]++;
-                        face_count++;
-                    }
-                }
-            }
-            
-            // RESET EDGES
-            for(int i=0;i<vertex_count;i++)
-                for(int j=0;j<vertex_degrees[i];j++)
-                    ed[i][j]=-1-ed[i][j];
-            
-            // KEEPING TRACK OF THIS WILL ALLOW US TO SPEED UP SOME COMPUTATION, OF BCC
-            int likely_bcc=0;
-            if(face_count==14 && pvector[4]==6 && pvector[6]==8) likely_bcc=1;   // THIS PVECTOR (0,6,0,8,0,...) OF A SIMPLE POLYHEDRON APPEARS IN 3 DIFFERENT TYPES, WITH SYMMETRIES 4, 8, AND 48
-            
-            
-            ////////////////////////////////////////////////////////////////
-            // BUILD THE CANONICAL CODE
-            ////////////////////////////////////////////////////////////////
-            
-            using WeinbergVector = std::vector<int>;
-            WeinbergVector canonical_code(2*edge_count,0);  // CANONICAL CODE WILL BE STORED HERE
-            int vertices_temp_labels[max_vpc] = {};         // TEMPORARY LABELS FOR ALL VERTICES; MAX max_vpc VERTICES
-            
-            int finished   =  0;
-            int chirality  = -1;
-            int symmetry_counter = 0;     // TRACKS NUMBER OF REPEATS OF A CODE, I.E. SYMMETRY ORDER
-            
-            for(int orientation=0; orientation<2 && finished==0; orientation++)
-            {
-                for(int q=0; q<origin_c && finished==0; q++)
-                {
-                    // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW
-                    std::fill(vertices_temp_labels, vertices_temp_labels+vertex_count, 0);
-                    
-                    for(int i=0;i<vertex_count;i++)
-                        for(int j=0;j<vertex_degrees[i];j++)
-                            if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
-                    
-                    int initial = origins[q];
-                    int next;
-                    int branch=0;
-                    
-                    if(orientation==0)
-                    {
-                        if((q+1)%min_face_edges==0) next = origins[q - min_face_edges + 1];
-                        else next = origins[q + 1];
-                    }
-                    else
-                    {
-                        if(q    %min_face_edges==0) next = origins[q + min_face_edges - 1];
-                        else next = origins[q - 1];
-                    }
-                    for(int j=0; j<vertex_degrees[origins[q]]; j++)
-                        if(ed[origins[q]][j]==next) branch=j;
-                    ed[initial][branch] = -1-next;
-                    
-                    int current_code_length   = 0;
-                    int current_highest_label = 1;
-                    int continue_code         = 0;    // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
-                    if(q==0 && orientation==0)        // FIRST CODE, GO AHEAD
-                        continue_code=1;
-                    
-                    vertices_temp_labels[initial] = current_highest_label++;
-                    canonical_code[current_code_length]  = vertices_temp_labels[initial];
-                    current_code_length++;
-                    
-                    // BUILD EACH CODE FOLLOWING WEINBERG'S RULES FOR TRAVERSING A GRAPH TO BUILD
-                    // A HAMILTONIAN PATH, LABELING VERTICES ALONG THE WAY, AND RECORDING VERTICES
-                    // AS VISITED.
-                    int end_flag=0;
-                    while(end_flag==0)
-                    {
-                        // NEXT VERTEX HAS NOT BEEN VISITED; TAKE RIGHT-MOST BRANCH TO CONTINUE.
-                        if(vertices_temp_labels[next]==0)
-                        {
-                            // LABEL THE NEW VERTEX
-                            vertices_temp_labels[next] = current_highest_label++;
-                            
-                            if(continue_code==0)
-                            {
-                                if(vertices_temp_labels[next]>canonical_code[current_code_length]) break;
-                                if(vertices_temp_labels[next]<canonical_code[current_code_length])
-                                {
-                                    symmetry_counter = 0;
-                                    continue_code    = 1;
-                                    if(orientation==1) chirality=1;
-                                }
-                            }
-                            
-                            // BUILD THE CODE
-                            canonical_code[current_code_length] = vertices_temp_labels[next];
-                            current_code_length++;
-                            
-                            // FIND NEXT DIRECTION TO MOVE ALONG, UPDATE, AND RELOOP
-                            if(orientation==0) branch  = vcell.cycle_up  (ed[initial][vertex_degrees[initial]+branch],next);
-                            else               branch  = vcell.cycle_down(ed[initial][vertex_degrees[initial]+branch],next);
-                            initial = next;
-                            next    = ed[initial][branch];
-                            ed[initial][branch] = -1-next;
-                        }
-                        
-                        else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
-                        {
-                            int next_branch = ed[initial][vertex_degrees[initial]+branch];
-                            int branches_tested = 0;
-                            
-                            while(ed[next][next_branch] < 0 && branches_tested<vertex_degrees[next])
-                            {
-                                if(orientation==0) next_branch = vcell.cycle_up  (next_branch,next);
-                                else               next_branch = vcell.cycle_down(next_branch,next);
-                                
-                                branches_tested++;
-                            }
-                            
-                            if(branches_tested < vertex_degrees[next])
-                            {
-                                if(continue_code==0)
-                                {
-                                    if(vertices_temp_labels[next]>canonical_code[current_code_length]) break;
-                                    if(vertices_temp_labels[next]<canonical_code[current_code_length])
-                                    {
-                                        symmetry_counter = 0;
-                                        continue_code    = 1;
-                                        if(orientation==1) chirality=1;
-                                    }
-                                }
-                                
-                                // BUILD THE CODE
-                                canonical_code[current_code_length] = vertices_temp_labels[next];
-                                current_code_length++;
-                                
-                                // FIND NEXT BRANCH
-                                branch  = next_branch;
-                                initial = next;
-                                next    = ed[initial][branch];
-                                ed[initial][branch] = -1-next;
-                            }
-                            
-                            else
-                            {
-                                end_flag=1;
-                                
-                                if(likely_bcc && symmetry_counter>4 && orientation==0) { chirality=0; symmetry_counter = 48; finished=1; }
-                                else if(chirality==-1 && orientation==1)               { chirality=0; symmetry_counter *= 2; finished=1; }
-                                else symmetry_counter++;
-                            }
-                        }
-                    }
-                }
-            }
+            // COMPUTE THE CANONICAL CODE, CHIRALITY, SYMMETRY, AND FACE DATA
+            VoronoiTopology result = compute_canonical_code_3d(vcell);
+
+            int edge_count       = vcell.number_of_edges();
+            int face_count       = result.face_count;
+            int max_face_edges   = result.max_face_edges;
+            int chirality        = result.chirality;
+            int symmetry_counter = result.symmetry_counter;
             
             
             const int tid=omp_get_thread_num();
@@ -511,12 +313,12 @@ void print_topology_vectors_3d(container_3d& con, std::string filename)
             buf[tid] << face_count        << '\t';     // NUMBER OF FACES
             buf[tid] << '(';                           // P VECTOR
             for(int d=3; d<max_face_edges; d++)
-                buf[tid] << pvector[d] << ',';
-            buf[tid] << pvector[max_face_edges] << ')' << '\t';
+                buf[tid] << result.pvector[d] << ',';
+            buf[tid] << result.pvector[max_face_edges] << ')' << '\t';
             
             buf[tid] << '(';                           // WEINBERG VECTOR
             for(int d=0; d<2*edge_count; d++)
-                buf[tid] << canonical_code[d] << ',';
+                buf[tid] << result.canonical_code[d] << ',';
             buf[tid] << 1 << ')' << '\t';
             
             buf[tid] << symmetry_counter << '\t';      // SYMMETRIES
@@ -534,75 +336,56 @@ void print_topology_vectors_3d(container_3d& con, std::string filename)
 }
 
 
-int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d& vcell)
+VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
 {
     const int max_epf = 256;    // MAXIMUM EDGES PER FACE
     const int max_epc = 512;    // MAXIMUM EDGES PER CELL
     const int max_vpc = 512;    // MAXIMUM VERTICES PER CELL
-    
+
     int   edge_count     = vcell.number_of_edges();
     int   vertex_count   = vcell.p;    // TOTAL NUMBER OF VERTICES
     int*  vertex_degrees = vcell.nu;   // VERTEX DEGREE ARRAY
     int** ed             = vcell.ed;   // EDGE CONNECTIONS ARRAY
-    
-    canonical_code.resize(2*edge_count);  // CANONICAL CODE WILL BE STORED HERE
-    
+
+    std::vector<int> canonical_code(2*edge_count, 0);  // CANONICAL CODE WILL BE STORED HERE
+
     int face_count         = 0;
     int max_face_edges     = 3;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 3 OR MORE EDGES
     int min_face_edges     = 5;     // EVERY CONVEX POLYHEDRON MUST HAVE AT LEAST ONE FACE WITH 5 OR FEWER EDGES
     int pvector[max_epf]   = {};    // RECORDS NUMBER OF FACES WITH EACH NUMBER OF EDGES, NO FACE IN FILTER HAS MORE THAN max_epf-1 EDGES
     int origins[2*max_epc] = {};    // NO VORONOI CELL IN FILTER HAS MORE THAN max_epc EDGES
     int origin_c           = 0;
-    
-    // DETERMINE VERTICES ON FACES WITH MINIMAL EDGES, AND FACES WITH DIFFERENT NUMBERS OF EDGES
-    for(int i=0;i<vertex_count;i++)
+
+    // USE VORO++'S FACE_VERTICES() TO GET FACE DATA DIRECTLY,
+    // AVOIDING MANUAL FACE TRACING AND THE SIGN-FLIP/RESET CYCLE.
+    std::vector<int> fv;
+    vcell.face_vertices(fv);
     {
-        for(int j=0;j<vertex_degrees[i];j++)
+        int pos = 0;
+        while(pos < (int)fv.size())
         {
-            int k = ed[i][j];
-            if(k >= 0)
+            int face_c = fv[pos];   // NUMBER OF EDGES/VERTICES IN THIS FACE
+            face_count++;
+            pvector[face_c]++;
+            if(face_c > max_face_edges)
+                max_face_edges = face_c;
+            if(face_c < min_face_edges)
             {
-                int face[max_epf]={};  // NO SINGLE FACE WILL HAVE MORE THAN max_epf EDGES
-                int face_c=0;
-                
-                ed[i][j]=-1-k;      // INDICATE THAT WE HAVE CHECKED THIS VERTEX
-                int l=vcell.cycle_up(ed[i][vertex_degrees[i]+j],k);
-                face[face_c++]=k;
-                do {
-                    int m=ed[k][l];
-                    ed[k][l]=-1-m;
-                    l=vcell.cycle_up(ed[k][vertex_degrees[k]+l],m);
-                    k=m;
-                    
-                    face[face_c++]=m;
-                } while (k!=i);
-                
-                // KEEP TRACK OF MINIMAL AND MAXIMAL FACE EDGES
-                if(face_c>max_face_edges)
-                    max_face_edges = face_c;
-                if(face_c<min_face_edges)
-                {
-                    min_face_edges = origin_c = face_c;
-                    for(int c=0; c<face_c; c++)
-                        origins[c] = face[c];
-                }
-                else if(face_c==min_face_edges)
-                {
-                    for(int c=0; c<face_c; c++)
-                        origins[origin_c+c] = face[c];
-                    origin_c += face_c;
-                }
-                pvector[face_c]++;
-                face_count++;
+                min_face_edges = face_c;
+                origin_c = face_c;
+                for(int c = 0; c < face_c; c++)
+                    origins[c] = fv[pos + 1 + c];
             }
+            else if(face_c == min_face_edges)
+            {
+                for(int c = 0; c < face_c; c++)
+                    origins[origin_c + c] = fv[pos + 1 + c];
+                origin_c += face_c;
+            }
+            pos += face_c + 1;
         }
     }
-    
-    // RESET EDGES
-    for(int i=0;i<vertex_count;i++)
-        for(int j=0;j<vertex_degrees[i];j++)
-            ed[i][j]=-1-ed[i][j];
-    
+
     // KEEPING TRACK OF THIS WILL ALLOW US TO SPEED UP SOME COMPUTATION, OF BCC
     int likely_bcc=0;
     if(face_count==14 && pvector[4]==6 && pvector[6]==8) likely_bcc=1;   // THIS PVECTOR (0,6,0,8,0,...) OF A SIMPLE POLYHEDRON APPEARS IN 3 DIFFERENT TYPES, WITH SYMMETRIES 4, 8, AND 48
@@ -611,28 +394,36 @@ int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d&
     ////////////////////////////////////////////////////////////////
     // BUILD THE CANONICAL CODE
     ////////////////////////////////////////////////////////////////
-    
+
     int vertices_temp_labels[max_vpc] = {};         // TEMPORARY LABELS FOR ALL VERTICES; MAX max_vpc VERTICES
-    
+
+    // GENERATION COUNTER FOR O(1) RESET OF VISITED-DART STATE.
+    // INSTEAD OF FLIPPING SIGNS IN ed[][] AND RESETTING BEFORE EACH
+    // STARTING DART, WE INCREMENT A GENERATION COUNTER.  A DART
+    // (vertex, branch) IS "VISITED" IFF visited_gen[offset] == generation.
+    int dart_offset[max_vpc];
+    dart_offset[0] = 0;
+    for(int i=1; i<vertex_count; i++)
+        dart_offset[i] = dart_offset[i-1] + vertex_degrees[i-1];
+    int visited_gen[2*max_epc] = {};
+    int generation = 0;
+
     int finished   =  0;
     int chirality  = -1;
     int symmetry_counter = 0;     // TRACKS NUMBER OF REPEATS OF A CODE, I.E. SYMMETRY ORDER
-    
+
     for(int orientation=0; orientation<2 && finished==0; orientation++)
     {
         for(int q=0; q<origin_c && finished==0; q++)
         {
-            // CLEAR ALL LABELS; MARK ALL BRANCHES OF ALL VERTICES AS NEW
+            // CLEAR ALL LABELS; MARK ALL BRANCHES AS NEW (O(1) RESET)
             std::fill(vertices_temp_labels, vertices_temp_labels+vertex_count, 0);
-            
-            for(int i=0;i<vertex_count;i++)
-                for(int j=0;j<vertex_degrees[i];j++)
-                    if(ed[i][j]<0) ed[i][j]=-1-ed[i][j];
-            
+            generation++;
+
             int initial = origins[q];
             int next;
             int branch=0;
-            
+
             if(orientation==0)
             {
                 if((q+1)%min_face_edges==0) next = origins[q - min_face_edges + 1];
@@ -645,18 +436,18 @@ int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d&
             }
             for(int j=0; j<vertex_degrees[origins[q]]; j++)
                 if(ed[origins[q]][j]==next) branch=j;
-            ed[initial][branch] = -1-next;
-            
+            visited_gen[dart_offset[initial] + branch] = generation;
+
             int current_code_length   = 0;
             int current_highest_label = 1;
             int continue_code         = 0;    // 0: UNDECIDED; 1: GO AHEAD, DO NOT EVEN CHECK.
             if(q==0 && orientation==0)        // FIRST CODE, GO AHEAD
                 continue_code=1;
-            
+
             vertices_temp_labels[initial] = current_highest_label++;
             canonical_code[current_code_length]  = vertices_temp_labels[initial];
             current_code_length++;
-            
+
             // BUILD EACH CODE FOLLOWING WEINBERG'S RULES FOR TRAVERSING A GRAPH TO BUILD
             // A HAMILTONIAN PATH, LABELING VERTICES ALONG THE WAY, AND RECORDING VERTICES
             // AS VISITED.
@@ -668,7 +459,7 @@ int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d&
                 {
                     // LABEL THE NEW VERTEX
                     vertices_temp_labels[next] = current_highest_label++;
-                    
+
                     if(continue_code==0)
                     {
                         if(vertices_temp_labels[next]>canonical_code[current_code_length]) break;
@@ -679,32 +470,32 @@ int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d&
                             if(orientation==1) chirality=1;
                         }
                     }
-                    
+
                     // BUILD THE CODE
                     canonical_code[current_code_length] = vertices_temp_labels[next];
                     current_code_length++;
-                    
+
                     // FIND NEXT DIRECTION TO MOVE ALONG, UPDATE, AND RELOOP
                     if(orientation==0) branch  = vcell.cycle_up  (ed[initial][vertex_degrees[initial]+branch],next);
                     else               branch  = vcell.cycle_down(ed[initial][vertex_degrees[initial]+branch],next);
                     initial = next;
                     next    = ed[initial][branch];
-                    ed[initial][branch] = -1-next;
+                    visited_gen[dart_offset[initial] + branch] = generation;
                 }
-                
+
                 else    // NEXT VERTEX *HAS* BEEN VISITED BEFORE
                 {
                     int next_branch = ed[initial][vertex_degrees[initial]+branch];
                     int branches_tested = 0;
-                    
-                    while(ed[next][next_branch] < 0 && branches_tested<vertex_degrees[next])
+
+                    while(visited_gen[dart_offset[next] + next_branch] == generation && branches_tested<vertex_degrees[next])
                     {
                         if(orientation==0) next_branch = vcell.cycle_up  (next_branch,next);
                         else               next_branch = vcell.cycle_down(next_branch,next);
-                        
+
                         branches_tested++;
                     }
-                    
+
                     if(branches_tested < vertex_degrees[next])
                     {
                         if(continue_code==0)
@@ -717,22 +508,22 @@ int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d&
                                 if(orientation==1) chirality=1;
                             }
                         }
-                        
+
                         // BUILD THE CODE
                         canonical_code[current_code_length] = vertices_temp_labels[next];
                         current_code_length++;
-                        
+
                         // FIND NEXT BRANCH
                         branch  = next_branch;
                         initial = next;
                         next    = ed[initial][branch];
-                        ed[initial][branch] = -1-next;
+                        visited_gen[dart_offset[initial] + branch] = generation;
                     }
-                    
+
                     else
                     {
                         end_flag=1;
-                        
+
                         if(likely_bcc && symmetry_counter>4 && orientation==0) { chirality=0; symmetry_counter = 48; finished=1; }
                         else if(chirality==-1 && orientation==1)               { chirality=0; symmetry_counter *= 2; finished=1; }
                         else symmetry_counter++;
@@ -742,7 +533,9 @@ int compute_canonical_code_3d(vector<int>& canonical_code, voro::voronoicell_3d&
         }
     }
     canonical_code.push_back(1);
-    return chirality;
+    return {canonical_code, chirality, symmetry_counter,
+            face_count, max_face_edges,
+            std::vector<int>(pvector, pvector + max_epf)};
 }
 
 
@@ -757,10 +550,9 @@ int classify_particles_by_voronoi_topology_3d(container_3d& con, Filter &filter)
             const int ijk=cli->ijk,q=cli->q;
             const int pid = con.id[ijk][q];
             
-            std::vector<int> canonical_code;                // CANONICAL CODE WILL BE STORED HERE
-            compute_canonical_code_3d(canonical_code, vcell);
-            
-            vt_structure_types[pid] = filter.vt_structure_type(canonical_code);
+            VoronoiTopology result = compute_canonical_code_3d(vcell);
+
+            vt_structure_types[pid] = filter.vt_structure_type(result.canonical_code);
         }
     }
     

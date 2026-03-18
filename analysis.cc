@@ -99,11 +99,10 @@ void calc_gaussian_distribution_3d(Filter &filter) {
         for (auto cli = con3d_perturbed.begin(); cli < con3d_perturbed.end(); ++cli) {
             voro::voronoicell_3d vcell;
             if (con3d_perturbed.compute_cell(vcell, cli)) {
-                std::vector<int> canonical_code;  // CANONICAL CODE WILL BE STORED HERE
-                int chirality = compute_canonical_code_3d(canonical_code, vcell);
+                VoronoiTopology result = compute_canonical_code_3d(vcell);
 
                 int tid = omp_get_thread_num();
-                local_filter[tid].increment_or_add(canonical_code, chirality, 1);
+                local_filter[tid].increment_or_add(result.canonical_code, result.chirality, 1);
             }
         }
 
