@@ -182,17 +182,47 @@ void Filter::print_distribution(std::string filename)
     {
         throw std::runtime_error("Failed to open distribution file: " + distribution_name);
     }
-    
+
+    // COMPUTE TOTAL SAMPLES AND SINGLETON/DOUBLETON COUNTS
+    long long N = 0;
+    int f1 = 0, f2 = 0;
+    for(const auto& entry : entries)
+    {
+        N += entry.second.total;
+        if(entry.second.total == 1) f1++;
+        if(entry.second.total == 2) f2++;
+    }
+
     // OUTPUT INFORMATION ABOUT SOURCE OF DISTRIBUTION
     distribution_file << "#\tDISTRIBUTION CREATED FROM ";
     if(g_switch==1) distribution_file << "PERTURBATIONS OF ";
     distribution_file << filename;
-    if(g_switch==1) distribution_file << ", USING " << perturbation_samples << " PERTURBATIONS WITH MAGNITUDE " << perturbation_size;
+    if(g_switch==1) distribution_file << ", PERTURBATION MAGNITUDE " << perturbation_size;
     distribution_file << '\n';
 
-    if(g_switch==1) distribution_file << "#\tTotal particles sampled: " << number_of_particles*perturbation_samples << '\n';
-    else            distribution_file << "#\tTotal particles sampled: " << number_of_particles << '\n';
+    distribution_file << "#\tTotal particles sampled: " << N << '\n';
     distribution_file << "#\tTotal Voronoi topologies observed: " << entries.size() << '\n';
+
+    // COVERAGE STATISTICS FOR PERTURBATION-BASED DISTRIBUTIONS
+    if(g_switch==1)
+    {
+        double coverage = (N > 0) ? 1.0 - (double)f1 / N : 0.0;
+
+        distribution_file << "#\tSingletons (types seen once): " << f1 << '\n';
+        distribution_file << "#\tDoubletons (types seen twice): " << f2 << '\n';
+        distribution_file << "#\tGood-Turing coverage estimate: " << std::fixed << std::setprecision(6)
+                          << coverage * 100.0 << "%\n";
+
+        if(f2 > 0)
+        {
+            double chao1 = entries.size() + (double)f1 * f1 / (2.0 * f2);
+            distribution_file << "#\tChao1 estimated total types: " << (int)(chao1 + 0.5) << '\n';
+        }
+
+        distribution_file << "#\tCoverage indicates the estimated fraction of particles in a\n";
+        distribution_file << "#\tsystem at this perturbation level whose topology is in this filter.\n";
+    }
+
     distribution_file << "#\tColumns indicate: Voronoi topology vector, total count, left-handed, non-chiral, and right-handed types\n";
     
     // SORT BY COUNT, THEN BY VORONOI TOPOLOGY VECTOR

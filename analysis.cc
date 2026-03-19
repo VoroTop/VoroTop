@@ -18,6 +18,7 @@
 
 
 #include <set>
+#include <cmath>
 #include <queue>
 #include <random>
 #include <iostream>
@@ -35,85 +36,217 @@ bool vector_size(const std::vector<int>& a,const std::vector<int>& b)
 
 ////////////////////////////////////////////////////
 ////
-////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS 
-////   OF A GIVEN 2D SYSTEM.  USEFUL FOR ANALYZING 
-////   REALISTIC VERSIONS OF IDEAL SYSTEMS.
+////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS
+////   OF A GIVEN 2D SYSTEM VIA CELL REPLICATION.
+////
+////   THE SYSTEM IS REPLICATED INTO A LARGE SUPERCELL
+////   (AT LEAST 5x5) WITH GAUSSIAN PERTURBATIONS
+////   APPLIED TO EACH PARTICLE.  THIS ENSURES NEIGHBOR
+////   INDEPENDENCE FOR SMALL UNIT CELLS.
 ////
 ////////////////////////////////////////////////////
 
 void calc_gaussian_distribution_2d(Filter &filter)
 {
-    std::mt19937 generator(std::random_device{}());
-    std::normal_distribution<double> distribution(0., perturbation_size);
-    
-    // NEW, PERTURBED VERSION OF THE ORIGINAL SYSTEM
-    voro::container_2d con2d_perturbed (xlo,xhi,ylo,yhi,n_x,n_y,true,true,4,threads);
-    
-    for(int loop = 0; loop < perturbation_samples; loop++)
+    int n = std::max(5, (int)ceil(sqrt((double)perturbation_samples / number_of_particles)));
+    long long total_particles = (long long)number_of_particles * n * n;
+
+    // MEMORY CHECK: EACH PARTICLE NEEDS ~16 BYTES FOR COORDINATES PLUS
+    // OVERHEAD FOR CONTAINERS AND NEIGHBOR LISTS.  CAP AT ~500 MILLION.
+    if(total_particles > 500000000LL)
     {
-        for(int c=0; c<number_of_particles; c++)
-        {
-            double x = particle_coordinates[2*c]   + distribution(generator);
-            double y = particle_coordinates[2*c+1] + distribution(generator);
-            con2d_perturbed.put(c,x,y);
-        }
-        
-        count_and_store_neighbors_2d(con2d_perturbed);
-        calc_distribution_2d(filter);
-        con2d_perturbed.clear();
+        std::cerr << "Error: supercell would contain " << total_particles
+                  << " particles, which is too large for available memory.\n"
+                  << "Reduce the target sample count or use a larger input system.\n";
+        exit(1);
     }
+
+    std::cout << "Perturbation sampling: " << number_of_particles << " particles in input, "
+              << "target " << perturbation_samples << " samples" << std::endl;
+    std::cout << "Replicating to " << n << "x" << n
+              << " supercell (" << total_particles << " particles)" << std::endl;
+
+    double Lx = xhi - xlo;
+    double Ly = yhi - ylo;
+    double ox = xlo, oy = ylo;
+
+    std::mt19937 generator(std::random_device{}());
+    std::normal_distribution<double> noise(0., perturbation_size);
+
+    std::vector<double> rep_coords(total_particles * 2);
+    int idx = 0;
+
+    for(int ki = 0; ki < n; ki++)
+    for(int kj = 0; kj < n; kj++)
+    {
+        double dx = ki * Lx;
+        double dy = kj * Ly;
+
+        for(int p = 0; p < number_of_particles; p++)
+        {
+            rep_coords[2*idx]     = (particle_coordinates[2*p]     - ox) + dx + noise(generator);
+            rep_coords[2*idx + 1] = (particle_coordinates[2*p + 1] - oy) + dy + noise(generator);
+            idx++;
+        }
+    }
+
+    double new_Lx = n * Lx;
+    double new_Ly = n * Ly;
+
+    // GRID BLOCK SIZES FOR SUPERCELL
+    int total_blocks = total_particles / 4 + 1;
+    double lpb = pow(new_Lx * new_Ly / (double)total_blocks, 1./2.);
+    int rep_nx = (int)(new_Lx / lpb) + 1;
+    int rep_ny = (int)(new_Ly / lpb) + 1;
+
+    // TEMPORARILY SWAP GLOBAL STATE FOR EXISTING 2D FUNCTIONS
+    int orig_nop = number_of_particles;
+    double* orig_coords = particle_coordinates;
+    double orig_xlo = xlo, orig_xhi = xhi;
+    double orig_ylo = ylo, orig_yhi = yhi;
+
+    number_of_particles = total_particles;
+    particle_coordinates = rep_coords.data();
+    xlo = 0; xhi = new_Lx;
+    ylo = 0; yhi = new_Ly;
+
+    list_of_neighbors.resize(total_particles);
+    cell_neighbor_count.resize(total_particles);
+
+    voro::container_2d con_rep(0, new_Lx, 0, new_Ly,
+                               rep_nx, rep_ny, true, true, 4, threads);
+    for(int i = 0; i < total_particles; i++)
+        con_rep.put(i, rep_coords[2*i], rep_coords[2*i+1]);
+
+    count_and_store_neighbors_2d(con_rep);
+    calc_distribution_2d(filter);
+
+    // RESTORE GLOBAL STATE
+    number_of_particles = orig_nop;
+    particle_coordinates = orig_coords;
+    xlo = orig_xlo; xhi = orig_xhi;
+    ylo = orig_ylo; yhi = orig_yhi;
+    list_of_neighbors.resize(orig_nop);
+    cell_neighbor_count.resize(orig_nop);
 }
 
 
 ////////////////////////////////////////////////////
 ////
-////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS 
-////   OF A GIVEN 3D SYSTEM.  USEFUL FOR ANALYZING 
-////   REALISTIC VERSIONS OF IDEAL SYSTEMS.
+////   DISTRIBUTION OF TYPES IN RANDOM PERTURBATIONS
+////   OF A GIVEN 3D SYSTEM VIA CELL REPLICATION.
+////
+////   THE SYSTEM IS REPLICATED INTO A LARGE SUPERCELL
+////   (AT LEAST 5x5x5) WITH GAUSSIAN PERTURBATIONS
+////   APPLIED TO EACH PARTICLE.  THIS ENSURES NEIGHBOR
+////   INDEPENDENCE FOR SMALL UNIT CELLS.
 ////
 ////////////////////////////////////////////////////
 
-void calc_gaussian_distribution_3d(Filter &filter) {
+void calc_gaussian_distribution_3d(Filter &filter)
+{
+    int n = std::max(5, (int)ceil(pow((double)perturbation_samples / number_of_particles, 1.0/3.0)));
+    long long total_particles = (long long)number_of_particles * n * n * n;
+
+    // MEMORY CHECK: EACH PARTICLE NEEDS ~24 BYTES FOR COORDINATES PLUS
+    // OVERHEAD FOR CONTAINERS AND TOPOLOGY COMPUTATION.  CAP AT ~500 MILLION.
+    if(total_particles > 500000000LL)
+    {
+        std::cerr << "Error: supercell would contain " << total_particles
+                  << " particles, which is too large for available memory.\n"
+                  << "Reduce the target sample count or use a larger input system.\n";
+        exit(1);
+    }
+
+    std::cout << "Perturbation sampling: " << number_of_particles << " particles in input, "
+              << "target " << perturbation_samples << " samples" << std::endl;
+    std::cout << "Replicating to " << n << "x" << n << "x" << n
+              << " supercell (" << total_particles << " particles)" << std::endl;
+
+    double Lx = xhi - xlo;
+    double Ly = yhi - ylo;
+    double Lz = zhi - zlo;
+
+    // ORIGIN OFFSET FOR ORTHOGONAL SYSTEMS (TRICLINIC ALREADY AT ORIGIN)
+    double ox = triclinic_crystal_system ? 0.0 : xlo;
+    double oy = triclinic_crystal_system ? 0.0 : ylo;
+    double oz = triclinic_crystal_system ? 0.0 : zlo;
+
     std::mt19937 generator(std::random_device{}());
-    std::normal_distribution<double> distribution(0., perturbation_size);
+    std::normal_distribution<double> noise(0., perturbation_size);
 
-    // Helper lambda: run perturbation loop on any container type
-    auto run_perturbations = [&](auto& con_perturbed) {
-        for (int loop = 0; loop < perturbation_samples; loop++) {
-            con_perturbed.clear();
+    std::vector<double> rep_coords(total_particles * 3);
+    int idx = 0;
 
-            for (int c = 0; c < number_of_particles; c++) {
-                double x = particle_coordinates[3 * c]     + distribution(generator);
-                double y = particle_coordinates[3 * c + 1] + distribution(generator);
-                double z = particle_coordinates[3 * c + 2] + distribution(generator);
-                con_perturbed.put(c, x, y, z);
-            }
+    for(int ki = 0; ki < n; ki++)
+    for(int kj = 0; kj < n; kj++)
+    for(int kk = 0; kk < n; kk++)
+    {
+        // SHIFT = ki*a + kj*b + kk*c (LATTICE VECTOR OFFSETS)
+        double dx = ki * Lx + kj * xy + kk * xz;
+        double dy =           kj * Ly + kk * yz;
+        double dz =                     kk * Lz;
 
-            std::vector<Filter> local_filter(threads);
+        for(int p = 0; p < number_of_particles; p++)
+        {
+            rep_coords[3*idx]     = (particle_coordinates[3*p]     - ox) + dx + noise(generator);
+            rep_coords[3*idx + 1] = (particle_coordinates[3*p + 1] - oy) + dy + noise(generator);
+            rep_coords[3*idx + 2] = (particle_coordinates[3*p + 2] - oz) + dz + noise(generator);
+            idx++;
+        }
+    }
 
-            #pragma omp parallel for num_threads(threads)
-            for (auto cli = con_perturbed.begin(); cli < con_perturbed.end(); ++cli) {
-                voro::voronoicell_3d vcell;
-                if (con_perturbed.compute_cell(vcell, cli)) {
-                    VoronoiTopology result = compute_canonical_code_3d(vcell);
-                    int tid = omp_get_thread_num();
-                    local_filter[tid].increment_or_add(result.canonical_code, result.chirality, 1);
-                }
-            }
+    // SUPERCELL BOX DIMENSIONS
+    double new_Lx = n * Lx;
+    double new_Ly = n * Ly;
+    double new_Lz = n * Lz;
+    double new_xy = n * xy;
+    double new_xz = n * xz;
+    double new_yz = n * yz;
 
-            for (int tid = 0; tid < threads; tid++) {
-                filter.copy_filter(local_filter[tid]);
+    // GRID BLOCK SIZES FOR SUPERCELL
+    int total_blocks = total_particles / 4 + 1;
+    double lpb = pow(new_Lx * new_Ly * new_Lz / (double)total_blocks, 1./3.);
+    int rep_nx = (int)(new_Lx / lpb) + 1;
+    int rep_ny = (int)(new_Ly / lpb) + 1;
+    int rep_nz = (int)(new_Lz / lpb) + 1;
+
+    // CREATE CONTAINER, ADD PARTICLES, AND COMPUTE TOPOLOGIES
+    auto compute_topologies = [&](auto& con_rep) {
+        for(int i = 0; i < total_particles; i++)
+            con_rep.put(i, rep_coords[3*i], rep_coords[3*i+1], rep_coords[3*i+2]);
+
+        std::vector<Filter> local_filter(threads);
+
+        #pragma omp parallel for num_threads(threads)
+        for(auto cli = con_rep.begin(); cli < con_rep.end(); ++cli)
+        {
+            voro::voronoicell_3d vcell;
+            if(con_rep.compute_cell(vcell, cli))
+            {
+                VoronoiTopology result = compute_canonical_code_3d(vcell);
+                int tid = omp_get_thread_num();
+                local_filter[tid].increment_or_add(result.canonical_code, result.chirality, 1);
             }
         }
+
+        for(int tid = 0; tid < threads; tid++)
+            filter.copy_filter(local_filter[tid]);
     };
 
-    if (triclinic_crystal_system) {
-        double bx = xhi - xlo, by_val = yhi - ylo, bz_val = zhi - zlo;
-        voro::container_triclinic con_perturbed(bx,xy,by_val,xz,yz,bz_val,n_x,n_y,n_z,8,threads);
-        run_perturbations(con_perturbed);
-    } else {
-        voro::container_3d con_perturbed(xlo,xhi,ylo,yhi,zlo,zhi,n_x,n_y,n_z,true,true,true,8,threads);
-        run_perturbations(con_perturbed);
+    if(triclinic_crystal_system)
+    {
+        voro::container_triclinic con_rep(new_Lx, new_xy, new_Ly,
+                                          new_xz, new_yz, new_Lz,
+                                          rep_nx, rep_ny, rep_nz, 8, threads);
+        compute_topologies(con_rep);
+    }
+    else
+    {
+        voro::container_3d con_rep(0, new_Lx, 0, new_Ly, 0, new_Lz,
+                                   rep_nx, rep_ny, rep_nz,
+                                   true, true, true, 8, threads);
+        compute_topologies(con_rep);
     }
 }
 
