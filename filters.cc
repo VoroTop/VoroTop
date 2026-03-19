@@ -21,6 +21,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 #include <iterator>
 #include <algorithm>
 #include <stdexcept>
@@ -215,6 +216,79 @@ void Filter::print_distribution(std::string filename)
     }
 }
 
+
+
+void Filter::print_filter(std::string filename)
+{
+    std::string filter_name(filename);
+    filter_name += ".filter";
+    std::ofstream filter_file;
+    filter_file.open(filter_name.c_str());
+    if (!filter_file.is_open())
+    {
+        throw std::runtime_error("Failed to open filter file: " + filter_name);
+    }
+
+    // OUTPUT HEADER COMMENT
+    filter_file << "#\tFILTER CREATED FROM ";
+    if(perturbation_samples > 0) filter_file << "PERTURBATIONS OF ";
+    filter_file << filename;
+    if(perturbation_samples > 0) filter_file << ", PERTURBATION MAGNITUDE " << perturbation_size;
+    filter_file << '\n';
+    filter_file << "#\tTotal Voronoi topologies: " << entries.size() << '\n';
+
+    // COVERAGE STATISTICS FOR PERTURBATION-BASED FILTERS
+    if(perturbation_samples > 0)
+    {
+        // COMPUTE TOTAL SAMPLES (N), SINGLETONS (f1), AND DOUBLETONS (f2)
+        long long N = 0;
+        int f1 = 0, f2 = 0;
+        for(const auto& entry : entries)
+        {
+            N += entry.second.total;
+            if(entry.second.total == 1) f1++;
+            if(entry.second.total == 2) f2++;
+        }
+
+        // GOOD-TURING COVERAGE ESTIMATE: C = 1 - f1/N
+        double coverage = (N > 0) ? 1.0 - (double)f1 / N : 0.0;
+
+        filter_file << "#\tTotal particles sampled: " << N << '\n';
+        filter_file << "#\tSingletons (types seen once): " << f1 << '\n';
+        filter_file << "#\tDoubletons (types seen twice): " << f2 << '\n';
+        filter_file << "#\tGood-Turing coverage estimate: " << std::fixed << std::setprecision(6)
+                     << coverage * 100.0 << "%\n";
+
+        // CHAO1 ESTIMATE OF TOTAL TYPES (INCLUDING UNSEEN)
+        if(f2 > 0)
+        {
+            double chao1 = entries.size() + (double)f1 * f1 / (2.0 * f2);
+            filter_file << "#\tChao1 estimated total types: " << (int)(chao1 + 0.5) << '\n';
+        }
+
+        filter_file << "#\tCoverage indicates the estimated fraction of particles in a\n";
+        filter_file << "#\tsystem at this perturbation level whose topology is in this filter.\n";
+    }
+
+    // STRUCTURE TYPE LINE: SINGLE TYPE "Crystal"
+    filter_file << "*\t1\tCrystal\n";
+
+    // SORT BY COUNT (MOST COMMON FIRST), THEN BY VORONOI TOPOLOGY VECTOR
+    std::vector<std::map<std::vector<int>,FilterEntry>::iterator> sorted_entries;
+    for (auto it = entries.begin(); it != entries.end(); ++it)
+        sorted_entries.push_back(it);
+    std::sort(sorted_entries.begin(), sorted_entries.end(), compare_by_count_vector);
+
+    // OUTPUT EACH TOPOLOGY AS A FILTER ENTRY
+    for(auto it = sorted_entries.begin(); it != sorted_entries.end(); ++it)
+    {
+        filter_file << "1\t(";
+        const auto& topology_vector = (*it)->first;
+        for(auto value = topology_vector.begin(); value != topology_vector.end() - 1; ++value)
+            filter_file << *value << ',';
+        filter_file << topology_vector.back() << ")\n";
+    }
+}
 
 
 int Filter::count_indeterminate_types()

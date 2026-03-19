@@ -47,9 +47,15 @@ void help_message(void) {
     "                                               \n"
     "Syntax: VoroTop <filename> [options]           \n"
     "                                               \n"
-    "         VoroTop reads a LAMMPS dump input file and computes the complete Voronoi\n"
-    "         cell topology for each point.  Output is determined by options.         \n"
+    "         VoroTop reads an input file and computes the complete Voronoi cell      \n"
+    "         topology for each point.  Output is determined by options.              \n"
     "                                                                                 \n"
+    "Supported file formats (auto-detected):                                          \n"
+    "         LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, and CIF.  \n"
+    "         Both orthogonal and triclinic periodic cells are supported.  CIF files  \n"
+    "         are processed with full symmetry expansion; lattice centering (I, F, A, \n"
+    "         B, C, R) is automatically applied when not already included in the      \n"
+    "         listed symmetry operations.                                             \n"
     "                                                                                 \n"
     "Available options:                                                               \n"
     "                                                                                 \n"
@@ -66,6 +72,13 @@ void help_message(void) {
     " -g   : Compute distribution of w-vectors for perturbations of a system. This    \n"
     "        option should be followed by two numbers, one specifying the number of   \n"
     "        samples, the other specifying the size of the random perturbations.      \n"
+    " -mf  : Generate a filter file from a crystal structure, saved to                \n"
+    "        <filename>.filter.  If no additional arguments are given, the exact      \n"
+    "        (unperturbed) topologies are computed.  If followed by two numbers       \n"
+    "        (target sample count and perturbation size), the system is replicated    \n"
+    "        into a supercell and a Gaussian perturbation is applied.  All observed   \n"
+    "        topologies are collected into the filter.  A target of 1000000 is        \n"
+    "        recommended for thorough sampling.                                       \n"
     "                                                                                 \n"
     " -c   : Cluster analysis.  Particles with topological types not included in the  \n"
     "        specified filter are considered to be defects.  Defect particles with    \n"
@@ -193,6 +206,25 @@ void parse_command_line_options(int argc, char *argv[])
             }
         }
         
+        // GENERATE FILTER FILE FROM CRYSTAL STRUCTURE
+        else if(strcmp(argv[d],"-mf")==0)
+        {
+            mf_switch = 1;
+            // CHECK IF TWO OPTIONAL NUMERIC ARGUMENTS FOLLOW (PERTURBATION MODE)
+            if(d+2 < argc && argv[d+1][0]!='-' && argv[d+2][0]!='-')
+            {
+                perturbation_samples = atoi(argv[d+1]);
+                perturbation_size    = atof(argv[d+2]);
+                if(perturbation_samples < 1 || perturbation_size < 0)
+                {
+                    help_message();
+                    std::cout << "-mf perturbation mode requires positive sample count and non-negative perturbation size.\n";
+                    exit(0);
+                }
+                d += 2;
+            }
+        }
+
         // SPECIFY FILTER FILE
         else if(strcmp(argv[d],"-f")==0)                    
         {

@@ -27,6 +27,7 @@ extern bool d_switch;    // COMPUTE DISTRIBUTION OF P-VECTORS OR W-VECTORS
 extern bool e_switch;    // OUTPUT EPS FILE
 extern bool f_switch;    // LOAD FILTER FILE
 extern bool g_switch;    // COMPUTE DISTRIBUTION BASED ON PERTURBATIONS OF SYSTEM
+extern bool mf_switch;   // GENERATE FILTER FILE FROM CRYSTAL STRUCTURE
 extern bool l_switch;    // OUTPUT LAMMPS DUMP FILE
 extern bool n_switch;    // DO NOT DRAW VORONOI CELLS; ONLY DRAW PARTICLES
 extern bool u_switch;    // COMPUTE UNNORMALIZED VORONOI PAIR CORRELATION FUNCTION

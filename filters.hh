@@ -105,6 +105,7 @@ public:
 
     // Prints the distribution to a file. The parameter specifies the file path where the output will be written.
     void print_distribution(std::string file_path);       // PRINT DISTRIBUTION TO FILE
+    void print_filter(std::string file_path);              // PRINT FILTER TO FILE
 
     // RETURNS ASSOCIATED STRUCTURE TYPE:
     // The method returns an integer representing the structure type
