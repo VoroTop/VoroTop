@@ -20,7 +20,7 @@
 #   make CXX=g++-mp-15    (MacPorts)
 #   make CXX=g++-14       (Homebrew)
 CXX        := g++
-CXXSTD     := -std=c++11
+CXXSTD     := -std=c++14
 CXXFLAGS   := -Wall -Wextra -O3 -fopenmp -MMD -MP
 LDFLAGS    := -fopenmp
 LDLIBS     := -lvoro++
