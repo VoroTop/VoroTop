@@ -66,6 +66,10 @@ std::vector<char> column_types;
 std::vector<int> header_assigned_types;
 double coordinate_scale = 1.0;
 
+bool data_already_imported = false;
+std::vector<double> cif_coordinates;
+std::vector<int>    cif_types;
+
 std::string   filename_data;
 std::string   filename_filter;
 std::ifstream data_file;

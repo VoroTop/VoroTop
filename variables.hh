@@ -50,7 +50,7 @@ extern int particles_in_eps;
 extern int perturbation_samples;
 extern double perturbation_size;
 
-extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA, 2 = EXTENDED XYZ, 3 = POSCAR
+extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA, 2 = EXTENDED XYZ, 3 = POSCAR, 4 = CIF
 extern int header_lines;
 extern int particle_attributes;
 
@@ -65,6 +65,10 @@ extern std::vector<char> column_types;  // PER-COLUMN TYPE: 'S'=STRING, 'R'=REAL
 
 extern std::vector<int> header_assigned_types;  // PRE-ASSIGNED TYPES FROM FILE HEADER (POSCAR)
 extern double coordinate_scale;                 // COORDINATE MULTIPLIER (POSCAR CARTESIAN MODE)
+
+extern bool data_already_imported;              // CIF PARSER POPULATES ARRAYS DIRECTLY
+extern std::vector<double> cif_coordinates;     // TEMPORARY STORAGE FOR CIF-PARSED POSITIONS
+extern std::vector<int>    cif_types;           // TEMPORARY STORAGE FOR CIF-PARSED TYPES
 
 extern std::string   filename_data;
 extern std::string   filename_filter;

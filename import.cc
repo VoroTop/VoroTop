@@ -27,6 +27,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <map>
+#include <algorithm>
 
 #include "filters.hh"
 #include "variables.hh"
@@ -520,6 +521,505 @@ static void parse_extended_xyz(std::ifstream& fp)
 
 ////////////////////////////////////////////////////
 ////
+////   CIF HELPER FUNCTIONS.
+////
+////   strip_cif_uncertainty: Remove parenthesized
+////   uncertainty from CIF numbers, e.g. "3.52(5)"
+////   becomes "3.52".
+////
+////   tokenize_cif_line: Split a CIF data line on
+////   whitespace, respecting single- and double-quoted
+////   strings as single tokens.
+////
+////////////////////////////////////////////////////
+
+static std::string strip_cif_uncertainty(const std::string& s)
+{
+    size_t p = s.find('(');
+    if(p != std::string::npos)
+        return s.substr(0, p);
+    return s;
+}
+
+static std::vector<std::string> tokenize_cif_line(const std::string& line)
+{
+    std::vector<std::string> tokens;
+    size_t i = 0;
+    while(i < line.size())
+    {
+        // SKIP WHITESPACE
+        while(i < line.size() && (line[i] == ' ' || line[i] == '\t'))
+            i++;
+        if(i >= line.size()) break;
+
+        // QUOTED STRING
+        if(line[i] == '\'' || line[i] == '"')
+        {
+            char quote = line[i];
+            i++;
+            size_t start = i;
+            while(i < line.size() && line[i] != quote)
+                i++;
+            tokens.push_back(line.substr(start, i - start));
+            if(i < line.size()) i++;  // SKIP CLOSING QUOTE
+        }
+        else
+        {
+            // UNQUOTED TOKEN
+            size_t start = i;
+            while(i < line.size() && line[i] != ' ' && line[i] != '\t')
+                i++;
+            tokens.push_back(line.substr(start, i - start));
+        }
+    }
+    return tokens;
+}
+
+
+////////////////////////////////////////////////////
+////
+////   CIF SYMMETRY OPERATION PARSER.
+////
+////   Each symmetry operation is a string like
+////   "-x+1/2, y, -z+1/4".  This is parsed into
+////   an affine transformation:
+////
+////     x' = rot[0]*x + rot[1]*y + rot[2]*z + trans
+////
+////   The rotation coefficients are always -1, 0, or 1.
+////   The translation is a rational fraction (0, 1/6,
+////   1/4, 1/3, 1/2, 2/3, 3/4, 5/6).
+////
+////////////////////////////////////////////////////
+
+struct SymOp {
+    double rot[3][3];   // ROTATION/REFLECTION MATRIX
+    double trans[3];    // TRANSLATION VECTOR
+};
+
+static void parse_symop_component(const std::string& expr,
+                                  double& cx, double& cy, double& cz, double& constant)
+{
+    cx = cy = cz = constant = 0.0;
+    int sign = 1;
+    size_t i = 0;
+
+    while(i < expr.size())
+    {
+        char ch = expr[i];
+
+        // SKIP WHITESPACE
+        if(ch == ' ' || ch == '\t') { i++; continue; }
+
+        // SIGN
+        if(ch == '+') { sign = 1;  i++; continue; }
+        if(ch == '-') { sign = -1; i++; continue; }
+
+        // VARIABLE: x, y, z
+        if(ch == 'x' || ch == 'X') { cx += sign; sign = 1; i++; continue; }
+        if(ch == 'y' || ch == 'Y') { cy += sign; sign = 1; i++; continue; }
+        if(ch == 'z' || ch == 'Z') { cz += sign; sign = 1; i++; continue; }
+
+        // NUMBER: COULD BE INTEGER, DECIMAL, OR FRACTION
+        if(std::isdigit(ch) || ch == '.')
+        {
+            size_t start = i;
+            while(i < expr.size() && (std::isdigit(expr[i]) || expr[i] == '.'))
+                i++;
+
+            double num = std::stod(expr.substr(start, i - start));
+
+            // SKIP WHITESPACE BEFORE POSSIBLE '/'
+            while(i < expr.size() && (expr[i] == ' ' || expr[i] == '\t'))
+                i++;
+
+            // CHECK FOR FRACTION
+            if(i < expr.size() && expr[i] == '/')
+            {
+                i++;
+                while(i < expr.size() && (expr[i] == ' ' || expr[i] == '\t'))
+                    i++;
+                size_t dstart = i;
+                while(i < expr.size() && (std::isdigit(expr[i]) || expr[i] == '.'))
+                    i++;
+                double denom = std::stod(expr.substr(dstart, i - dstart));
+                num /= denom;
+            }
+
+            // CHECK IF FOLLOWED BY A VARIABLE (E.G. "2x" — RARE BUT VALID)
+            while(i < expr.size() && (expr[i] == ' ' || expr[i] == '\t'))
+                i++;
+            if(i < expr.size() && (expr[i] == 'x' || expr[i] == 'X'))
+                { cx += sign * num; sign = 1; i++; }
+            else if(i < expr.size() && (expr[i] == 'y' || expr[i] == 'Y'))
+                { cy += sign * num; sign = 1; i++; }
+            else if(i < expr.size() && (expr[i] == 'z' || expr[i] == 'Z'))
+                { cz += sign * num; sign = 1; i++; }
+            else
+                { constant += sign * num; sign = 1; }
+
+            continue;
+        }
+
+        // SKIP UNRECOGNIZED CHARACTERS
+        i++;
+    }
+}
+
+static SymOp parse_symop(const std::string& op_str)
+{
+    SymOp op = {};
+
+    // SPLIT ON COMMAS TO GET THREE COMPONENTS
+    std::vector<std::string> components;
+    std::istringstream css(op_str);
+    std::string comp;
+    while(getline(css, comp, ','))
+        components.push_back(comp);
+
+    if(components.size() != 3)
+        throw std::runtime_error("CIF: symmetry operation must have 3 components: " + op_str);
+
+    for(int i = 0; i < 3; i++)
+    {
+        double cx, cy, cz, constant;
+        parse_symop_component(components[i], cx, cy, cz, constant);
+        op.rot[i][0] = cx;
+        op.rot[i][1] = cy;
+        op.rot[i][2] = cz;
+        op.trans[i]  = constant;
+    }
+
+    return op;
+}
+
+
+////////////////////////////////////////////////////
+////
+////   CIF DUPLICATE DETECTION.
+////
+////   After applying symmetry operations, atoms on
+////   special positions or cell boundaries may produce
+////   duplicate positions.  Two fractional coordinates
+////   are considered identical if they differ by less
+////   than a tolerance, accounting for periodic wrapping
+////   near 0/1.
+////
+////////////////////////////////////////////////////
+
+static double frac_wrap(double f)
+{
+    f = fmod(f, 1.0);
+    if(f < 0) f += 1.0;
+    if(f >= 1.0 - 1e-6) f = 0.0;  // SNAP VALUES NEAR 1.0 TO 0.0
+    return f;
+}
+
+static bool is_duplicate(double fx, double fy, double fz,
+                         const std::vector<double>& coords, int n_atoms,
+                         double tol)
+{
+    for(int i = 0; i < n_atoms; i++)
+    {
+        double dx = fabs(fx - coords[3*i]);
+        double dy = fabs(fy - coords[3*i+1]);
+        double dz = fabs(fz - coords[3*i+2]);
+
+        // ACCOUNT FOR PERIODIC WRAPPING
+        if(dx > 0.5) dx = 1.0 - dx;
+        if(dy > 0.5) dy = 1.0 - dy;
+        if(dz > 0.5) dz = 1.0 - dz;
+
+        if(dx < tol && dy < tol && dz < tol)
+            return true;
+    }
+    return false;
+}
+
+
+////////////////////////////////////////////////////
+////
+////   PARSE CIF (CRYSTALLOGRAPHIC INFORMATION FILE).
+////
+////   CIF files contain key-value pairs and loop_
+////   sections.  The parser extracts cell parameters,
+////   symmetry operations, and atom site positions.
+////   Symmetry operations are applied to the asymmetric
+////   unit to generate the full unit cell.
+////
+////   Only orthogonal cells (alpha=beta=gamma=90) are
+////   currently supported.
+////
+////////////////////////////////////////////////////
+
+static void parse_cif(std::ifstream& fp)
+{
+    scaled_coordinates = 0;
+    triclinic_crystal_system = 0;
+    data_already_imported = true;
+
+    // READ ENTIRE FILE INTO LINES
+    std::vector<std::string> lines;
+    std::string line;
+    while(getline(fp, line))
+        lines.push_back(line);
+
+    // PHASE 1: EXTRACT CELL PARAMETERS
+    double cell_a = 0, cell_b = 0, cell_c = 0;
+    double cell_alpha = 90, cell_beta = 90, cell_gamma = 90;
+
+    for(size_t i = 0; i < lines.size(); i++)
+    {
+        std::vector<std::string> tok = tokenize_cif_line(lines[i]);
+        if(tok.empty()) continue;
+
+        if(tok[0] == "_cell_length_a" && tok.size() >= 2)
+            cell_a = std::stod(strip_cif_uncertainty(tok[1]));
+        else if(tok[0] == "_cell_length_b" && tok.size() >= 2)
+            cell_b = std::stod(strip_cif_uncertainty(tok[1]));
+        else if(tok[0] == "_cell_length_c" && tok.size() >= 2)
+            cell_c = std::stod(strip_cif_uncertainty(tok[1]));
+        else if(tok[0] == "_cell_angle_alpha" && tok.size() >= 2)
+            cell_alpha = std::stod(strip_cif_uncertainty(tok[1]));
+        else if(tok[0] == "_cell_angle_beta" && tok.size() >= 2)
+            cell_beta = std::stod(strip_cif_uncertainty(tok[1]));
+        else if(tok[0] == "_cell_angle_gamma" && tok.size() >= 2)
+            cell_gamma = std::stod(strip_cif_uncertainty(tok[1]));
+    }
+
+    if(cell_a <= 0 || cell_b <= 0 || cell_c <= 0)
+        throw std::runtime_error("CIF: missing or invalid cell dimensions.");
+
+    // CHECK ORTHOGONALITY
+    if(fabs(cell_alpha - 90.0) > 0.01 || fabs(cell_beta - 90.0) > 0.01 || fabs(cell_gamma - 90.0) > 0.01)
+    {
+        triclinic_crystal_system = 1;
+        std::cerr << "VoroTop does not currently support non-orthogonal cells." << std::endl;
+        std::cerr << "Cell angles: alpha=" << cell_alpha << " beta=" << cell_beta
+                  << " gamma=" << cell_gamma << std::endl;
+        exit(1);
+    }
+
+    xlo = 0;  xhi = cell_a;
+    ylo = 0;  yhi = cell_b;
+    zlo = 0;  zhi = cell_c;
+
+    // PHASE 2: EXTRACT SYMMETRY OPERATIONS
+    std::vector<SymOp> symops;
+
+    for(size_t i = 0; i < lines.size(); i++)
+    {
+        std::string trimmed = lines[i];
+        size_t start = trimmed.find_first_not_of(" \t\r");
+        if(start == std::string::npos) continue;
+        trimmed = trimmed.substr(start);
+
+        if(trimmed != "loop_") continue;
+
+        // READ LOOP HEADER TAGS
+        std::vector<std::string> tags;
+        size_t j = i + 1;
+        while(j < lines.size())
+        {
+            std::string t = lines[j];
+            size_t s = t.find_first_not_of(" \t\r");
+            if(s == std::string::npos) { j++; continue; }
+            if(t[s] == '_')
+            {
+                std::vector<std::string> tk = tokenize_cif_line(t);
+                if(!tk.empty()) tags.push_back(tk[0]);
+                j++;
+            }
+            else break;
+        }
+
+        // CHECK IF THIS LOOP CONTAINS SYMMETRY OPERATIONS
+        int symop_col = -1;
+        for(int c = 0; c < (int)tags.size(); c++)
+        {
+            if(tags[c] == "_symmetry_equiv_pos_as_xyz" ||
+               tags[c] == "_space_group_symop_operation_xyz")
+                symop_col = c;
+        }
+        if(symop_col == -1) continue;
+
+        // READ SYMMETRY OPERATION DATA LINES
+        while(j < lines.size())
+        {
+            std::string dl = lines[j];
+            size_t s = dl.find_first_not_of(" \t\r");
+            if(s == std::string::npos) { j++; continue; }
+            if(dl[s] == '_' || dl[s] == '#') break;
+
+            // CHECK FOR loop_ OR data_ (CASE-SENSITIVE CIF KEYWORDS)
+            std::string keyword = dl.substr(s, 5);
+            if(keyword == "loop_" || keyword == "data_") break;
+
+            std::vector<std::string> vals = tokenize_cif_line(dl);
+            if((int)vals.size() <= symop_col) break;
+
+            symops.push_back(parse_symop(vals[symop_col]));
+            j++;
+        }
+        break;  // FOUND THE SYMMETRY LOOP, NO NEED TO CONTINUE
+    }
+
+    // DEFAULT: IDENTITY OPERATION IF NO SYMMETRY FOUND
+    if(symops.empty())
+    {
+        SymOp identity = {};
+        identity.rot[0][0] = identity.rot[1][1] = identity.rot[2][2] = 1.0;
+        symops.push_back(identity);
+    }
+
+    // PHASE 3: EXTRACT ATOM SITE POSITIONS
+    struct AsymAtom {
+        std::string species;
+        double fx, fy, fz;
+    };
+    std::vector<AsymAtom> asym_atoms;
+
+    for(size_t i = 0; i < lines.size(); i++)
+    {
+        std::string trimmed = lines[i];
+        size_t start = trimmed.find_first_not_of(" \t\r");
+        if(start == std::string::npos) continue;
+        trimmed = trimmed.substr(start);
+
+        if(trimmed != "loop_") continue;
+
+        // READ LOOP HEADER TAGS
+        std::vector<std::string> tags;
+        size_t j = i + 1;
+        while(j < lines.size())
+        {
+            std::string t = lines[j];
+            size_t s = t.find_first_not_of(" \t\r");
+            if(s == std::string::npos) { j++; continue; }
+            if(t[s] == '_')
+            {
+                std::vector<std::string> tk = tokenize_cif_line(t);
+                if(!tk.empty()) tags.push_back(tk[0]);
+                j++;
+            }
+            else break;
+        }
+
+        // CHECK IF THIS LOOP CONTAINS ATOM SITES
+        int col_fx = -1, col_fy = -1, col_fz = -1;
+        int col_type_symbol = -1, col_label = -1;
+        for(int c = 0; c < (int)tags.size(); c++)
+        {
+            if(tags[c] == "_atom_site_fract_x")    col_fx = c;
+            if(tags[c] == "_atom_site_fract_y")    col_fy = c;
+            if(tags[c] == "_atom_site_fract_z")    col_fz = c;
+            if(tags[c] == "_atom_site_type_symbol") col_type_symbol = c;
+            if(tags[c] == "_atom_site_label")       col_label = c;
+        }
+        if(col_fx == -1 || col_fy == -1 || col_fz == -1) continue;
+
+        // DETERMINE WHICH COLUMN TO USE FOR SPECIES
+        int col_species = (col_type_symbol != -1) ? col_type_symbol : col_label;
+
+        // READ ATOM SITE DATA LINES
+        while(j < lines.size())
+        {
+            std::string dl = lines[j];
+            size_t s = dl.find_first_not_of(" \t\r");
+            if(s == std::string::npos) { j++; continue; }
+            if(dl[s] == '_' || dl[s] == '#') break;
+
+            std::string keyword = dl.substr(s, 5);
+            if(keyword == "loop_" || keyword == "data_") break;
+
+            std::vector<std::string> vals = tokenize_cif_line(dl);
+            int max_col = std::max({col_fx, col_fy, col_fz});
+            if((int)vals.size() <= max_col) break;
+
+            AsymAtom atom;
+            atom.fx = std::stod(strip_cif_uncertainty(vals[col_fx]));
+            atom.fy = std::stod(strip_cif_uncertainty(vals[col_fy]));
+            atom.fz = std::stod(strip_cif_uncertainty(vals[col_fz]));
+
+            // EXTRACT SPECIES NAME
+            if(col_species != -1 && col_species < (int)vals.size())
+            {
+                atom.species = vals[col_species];
+                // IF USING LABEL (e.g. "Fe1"), STRIP TRAILING DIGITS
+                if(col_species == col_label)
+                {
+                    size_t end = atom.species.find_first_of("0123456789");
+                    if(end != std::string::npos)
+                        atom.species = atom.species.substr(0, end);
+                }
+            }
+            else
+            {
+                atom.species = "X";
+            }
+
+            asym_atoms.push_back(atom);
+            j++;
+        }
+        break;  // FOUND THE ATOM SITE LOOP
+    }
+
+    if(asym_atoms.empty())
+        throw std::runtime_error("CIF: no atom sites found.");
+
+    // PHASE 4: APPLY SYMMETRY OPERATIONS AND REMOVE DUPLICATES
+    std::vector<double> frac_coords;  // FRACTIONAL COORDS OF UNIQUE ATOMS (3 PER ATOM)
+    std::vector<std::string> atom_species;
+    int n_unique = 0;
+
+    for(const auto& atom : asym_atoms)
+    {
+        for(const auto& op : symops)
+        {
+            double fx = op.rot[0][0]*atom.fx + op.rot[0][1]*atom.fy + op.rot[0][2]*atom.fz + op.trans[0];
+            double fy = op.rot[1][0]*atom.fx + op.rot[1][1]*atom.fy + op.rot[1][2]*atom.fz + op.trans[1];
+            double fz = op.rot[2][0]*atom.fx + op.rot[2][1]*atom.fy + op.rot[2][2]*atom.fz + op.trans[2];
+
+            fx = frac_wrap(fx);
+            fy = frac_wrap(fy);
+            fz = frac_wrap(fz);
+
+            if(!is_duplicate(fx, fy, fz, frac_coords, n_unique, 0.01))
+            {
+                frac_coords.push_back(fx);
+                frac_coords.push_back(fy);
+                frac_coords.push_back(fz);
+                atom_species.push_back(atom.species);
+                n_unique++;
+            }
+        }
+    }
+
+    // ASSIGN SPECIES TO INTEGER TYPES
+    std::map<std::string, int> species_map;
+    int next_type = 1;
+
+    number_of_particles = n_unique;
+
+    // CONVERT FRACTIONAL TO ABSOLUTE COORDINATES AND STORE
+    cif_coordinates.resize(3 * number_of_particles);
+    cif_types.resize(number_of_particles);
+
+    for(int c = 0; c < number_of_particles; c++)
+    {
+        cif_coordinates[3*c]     = xlo + frac_coords[3*c]     * (xhi - xlo);
+        cif_coordinates[3*c + 1] = ylo + frac_coords[3*c + 1] * (yhi - ylo);
+        cif_coordinates[3*c + 2] = zlo + frac_coords[3*c + 2] * (zhi - zlo);
+
+        if(species_map.find(atom_species[c]) == species_map.end())
+            species_map[atom_species[c]] = next_type++;
+        cif_types[c] = species_map[atom_species[c]];
+    }
+}
+
+
+////////////////////////////////////////////////////
+////
 ////   PARSE VASP POSCAR/CONTCAR FILE.
 ////
 ////   Line 1: comment.
@@ -695,6 +1195,8 @@ static void parse_poscar(std::ifstream& fp)
 ////   LAMMPS dump: identified by "ITEM:" on line 1.
 ////   Extended XYZ: line 2 contains "Lattice=" or
 ////   "Properties=".
+////   CIF: a line starts with "data_" or contains
+////   "_cell_length_a".
 ////   POSCAR: line 2 is a single number and lines 3-5
 ////   each contain exactly 3 numbers.
 ////   Otherwise: assumed to be LAMMPS data file.
@@ -726,6 +1228,22 @@ void parse_header(std::ifstream& fp)
     {
         file_format = 2;  // EXTENDED XYZ
         parse_extended_xyz(fp);
+    }
+    else if ([&]() -> bool {
+        // CIF: ANY OF THE FIRST 5 LINES STARTS WITH "data_" OR CONTAINS "_cell_length_a"
+        for(int i = 0; i < 5; i++)
+        {
+            size_t s = detect_lines[i].find_first_not_of(" \t\r");
+            if(s != std::string::npos && detect_lines[i].substr(s, 5) == "data_")
+                return true;
+            if(detect_lines[i].find("_cell_length_a") != std::string::npos)
+                return true;
+        }
+        return false;
+    }())
+    {
+        file_format = 4;  // CIF
+        parse_cif(fp);
     }
     else if ([&]() -> bool {
         // POSCAR: LINE 2 IS A SINGLE NUMBER, LINES 3-5 EACH HAVE EXACTLY 3 NUMBERS
@@ -799,12 +1317,28 @@ void parse_header(std::ifstream& fp)
 ////   IMPORT PARTICLE DATA FROM FILE.
 ////   HANDLES ABSOLUTE, SCALED, AND UNWRAPPED
 ////   COORDINATE TYPES.  WORKS FOR LAMMPS DUMP,
-////   LAMMPS DATA, EXTENDED XYZ, AND POSCAR FORMATS.
+////   LAMMPS DATA, EXTENDED XYZ, POSCAR, AND CIF.
 ////
 ////////////////////////////////////////////////////
 
 void import_data()
 {
+    // CIF DATA WAS ALREADY FULLY PARSED DURING parse_header()
+    if(data_already_imported)
+    {
+        for(int c = 0; c < number_of_particles; c++)
+        {
+            particle_coordinates[3*c]     = cif_coordinates[3*c];
+            particle_coordinates[3*c + 1] = cif_coordinates[3*c + 1];
+            particle_coordinates[3*c + 2] = cif_coordinates[3*c + 2];
+            particle_ids[c]   = c + 1;
+            particle_types[c] = cif_types[c];
+        }
+        cif_coordinates.clear();
+        cif_types.clear();
+        return;
+    }
+
     FILE *in_file = fopen(filename_data.c_str(), "r");
     if (!in_file)
         throw std::runtime_error("Error opening file: " + filename_data);
