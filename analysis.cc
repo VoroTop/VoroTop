@@ -74,41 +74,46 @@ void calc_gaussian_distribution_2d(Filter &filter)
 ////////////////////////////////////////////////////
 
 void calc_gaussian_distribution_3d(Filter &filter) {
-    std::mt19937 generator(std::random_device{}());  // Seed with truly random seed
+    std::mt19937 generator(std::random_device{}());
     std::normal_distribution<double> distribution(0., perturbation_size);
 
-    // Create a container for perturbed particles
-    voro::container_3d con3d_perturbed(xlo,xhi,ylo,yhi,zlo,zhi,                                       
-                                       n_x, n_y, n_z, true, true, true, 8, threads);
+    // Helper lambda: run perturbation loop on any container type
+    auto run_perturbations = [&](auto& con_perturbed) {
+        for (int loop = 0; loop < perturbation_samples; loop++) {
+            con_perturbed.clear();
 
-    for (int loop = 0; loop < perturbation_samples; loop++) {
-        // Clear the container for new perturbed positions
-        con3d_perturbed.clear();
+            for (int c = 0; c < number_of_particles; c++) {
+                double x = particle_coordinates[3 * c]     + distribution(generator);
+                double y = particle_coordinates[3 * c + 1] + distribution(generator);
+                double z = particle_coordinates[3 * c + 2] + distribution(generator);
+                con_perturbed.put(c, x, y, z);
+            }
 
-        // INSERT PERTURBED PARTICLE POSITIONS INTO CONTAINER
-        for (int c = 0; c < number_of_particles; c++) {
-            double x = particle_coordinates[3 * c] + distribution(generator);
-            double y = particle_coordinates[3 * c + 1] + distribution(generator);
-            double z = particle_coordinates[3 * c + 2] + distribution(generator);
-            con3d_perturbed.put(c, x, y, z);
-        }
+            std::vector<Filter> local_filter(threads);
 
-        std::vector<Filter> local_filter(threads);
+            #pragma omp parallel for num_threads(threads)
+            for (auto cli = con_perturbed.begin(); cli < con_perturbed.end(); ++cli) {
+                voro::voronoicell_3d vcell;
+                if (con_perturbed.compute_cell(vcell, cli)) {
+                    VoronoiTopology result = compute_canonical_code_3d(vcell);
+                    int tid = omp_get_thread_num();
+                    local_filter[tid].increment_or_add(result.canonical_code, result.chirality, 1);
+                }
+            }
 
-        #pragma omp parallel for num_threads(threads)
-        for (auto cli = con3d_perturbed.begin(); cli < con3d_perturbed.end(); ++cli) {
-            voro::voronoicell_3d vcell;
-            if (con3d_perturbed.compute_cell(vcell, cli)) {
-                VoronoiTopology result = compute_canonical_code_3d(vcell);
-
-                int tid = omp_get_thread_num();
-                local_filter[tid].increment_or_add(result.canonical_code, result.chirality, 1);
+            for (int tid = 0; tid < threads; tid++) {
+                filter.copy_filter(local_filter[tid]);
             }
         }
+    };
 
-        for (int tid = 0; tid < threads; tid++) {
-            filter.copy_filter(local_filter[tid]);
-        }
+    if (triclinic_crystal_system) {
+        double bx = xhi - xlo, by_val = yhi - ylo, bz_val = zhi - zlo;
+        voro::container_triclinic con_perturbed(bx,xy,by_val,xz,yz,bz_val,n_x,n_y,n_z,8,threads);
+        run_perturbations(con_perturbed);
+    } else {
+        voro::container_3d con_perturbed(xlo,xhi,ylo,yhi,zlo,zhi,n_x,n_y,n_z,true,true,true,8,threads);
+        run_perturbations(con_perturbed);
     }
 }
 

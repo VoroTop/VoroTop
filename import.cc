@@ -94,30 +94,54 @@ static void parse_lammps_dump(std::ifstream& fp)
             if (line.find("abc origin") != std::string::npos)
             {
                 std::cerr << "VoroTop does not support general triclinic boxes." << std::endl;
-                std::cerr << "Please convert to an orthogonal box." << std::endl;
+                std::cerr << "Please convert to a restricted triclinic box." << std::endl;
                 exit(1);
             }
 
             // DETECT RESTRICTED TRICLINIC (xy xz yz ...)
-            if (line.find("xy xz yz") != std::string::npos)
+            bool is_triclinic = (line.find("xy xz yz") != std::string::npos);
+
+            if(is_triclinic)
             {
                 triclinic_crystal_system = 1;
-                std::cerr << "VoroTop does not currently support triclinic systems." << std::endl;
-                std::cerr << "Please convert to an orthogonal box." << std::endl;
-                exit(1);
+
+                // RESTRICTED TRICLINIC: EACH LINE HAS lo_bound hi_bound tilt
+                double xlo_bound, xhi_bound;
+                double ylo_bound, yhi_bound;
+                double zlo_bound, zhi_bound;
+
+                getline(fp, line); header_lines++;
+                std::istringstream(line) >> xlo_bound >> xhi_bound >> xy;
+
+                getline(fp, line); header_lines++;
+                std::istringstream(line) >> ylo_bound >> yhi_bound >> xz;
+
+                getline(fp, line); header_lines++;
+                std::istringstream(line) >> zlo_bound >> zhi_bound >> yz;
+
+                // CONVERT BOUNDING BOX TO ACTUAL BOX EDGES
+                xlo = xlo_bound - std::min({0.0, xy, xz, xy+xz});
+                xhi = xhi_bound - std::max({0.0, xy, xz, xy+xz});
+                ylo = ylo_bound - std::min(0.0, yz);
+                yhi = yhi_bound - std::max(0.0, yz);
+                zlo = zlo_bound;
+                zhi = zhi_bound;
             }
+            else
+            {
+                // ORTHOGONAL BOX: READ xlo xhi, ylo yhi, zlo zhi
+                triclinic_crystal_system = 0;
+                xy = xz = yz = 0;
 
-            // ORTHOGONAL BOX: READ xlo xhi, ylo yhi, zlo zhi
-            triclinic_crystal_system = 0;
+                getline(fp, line); header_lines++;
+                std::istringstream(line) >> xlo >> xhi;
 
-            getline(fp, line); header_lines++;
-            std::istringstream(line) >> xlo >> xhi;
+                getline(fp, line); header_lines++;
+                std::istringstream(line) >> ylo >> yhi;
 
-            getline(fp, line); header_lines++;
-            std::istringstream(line) >> ylo >> yhi;
-
-            getline(fp, line); header_lines++;
-            std::istringstream(line) >> zlo >> zhi;
+                getline(fp, line); header_lines++;
+                std::istringstream(line) >> zlo >> zhi;
+            }
 
             continue;
         }
@@ -230,9 +254,7 @@ static void parse_lammps_data(std::ifstream& fp)
         else if(content.find("xy xz yz") != std::string::npos)
         {
             triclinic_crystal_system = 1;
-            std::cerr << "VoroTop does not currently support triclinic systems." << std::endl;
-            std::cerr << "Please convert to an orthogonal box." << std::endl;
-            exit(1);
+            std::istringstream(content) >> xy >> xz >> yz;
         }
     }
 
@@ -389,16 +411,32 @@ static void parse_extended_xyz(std::ifstream& fp)
         }
 
         // LATTICE VECTORS: a = (v[0],v[1],v[2]), b = (v[3],v[4],v[5]), c = (v[6],v[7],v[8])
-        // CHECK IF ORTHOGONAL (ALL OFF-DIAGONAL COMPONENTS ARE ZERO)
-        if(v[1] != 0 || v[2] != 0 || v[3] != 0 || v[5] != 0 || v[6] != 0 || v[7] != 0)
+        // RESTRICTED TRICLINIC REQUIRES LOWER-TRIANGULAR FORM:
+        //   a = (bx, 0, 0), b = (bxy, by, 0), c = (bxz, byz, bz)
+        // I.E., UPPER TRIANGLE (v[1], v[2], v[5]) MUST BE ZERO.
+        if(v[1] != 0 || v[2] != 0 || v[5] != 0)
         {
-            triclinic_crystal_system = 1;
-            std::cerr << "VoroTop does not currently support triclinic systems." << std::endl;
-            std::cerr << "Please convert to an orthogonal box." << std::endl;
+            std::cerr << "Extended XYZ lattice vectors are not in restricted triclinic form." << std::endl;
+            std::cerr << "The first vector must be along x, the second in the xy plane." << std::endl;
+            std::cerr << "Please reorient the lattice vectors." << std::endl;
             exit(1);
         }
 
-        // ORTHOGONAL BOX WITH ORIGIN AT (0,0,0)
+        if(v[3] != 0 || v[6] != 0 || v[7] != 0)
+        {
+            // TRICLINIC: LOWER TRIANGLE HAS NON-ZERO TILT FACTORS
+            triclinic_crystal_system = 1;
+            xy = v[3];   // x-COMPONENT OF SECOND LATTICE VECTOR
+            xz = v[6];   // x-COMPONENT OF THIRD LATTICE VECTOR
+            yz = v[7];   // y-COMPONENT OF THIRD LATTICE VECTOR
+        }
+        else
+        {
+            triclinic_crystal_system = 0;
+            xy = xz = yz = 0;
+        }
+
+        // BOX WITH ORIGIN AT (0,0,0)
         xlo = 0;  xhi = v[0];
         ylo = 0;  yhi = v[4];
         zlo = 0;  zhi = v[8];
@@ -790,19 +828,40 @@ static void parse_cif(std::ifstream& fp)
     if(cell_a <= 0 || cell_b <= 0 || cell_c <= 0)
         throw std::runtime_error("CIF: missing or invalid cell dimensions.");
 
-    // CHECK ORTHOGONALITY
-    if(fabs(cell_alpha - 90.0) > 0.01 || fabs(cell_beta - 90.0) > 0.01 || fabs(cell_gamma - 90.0) > 0.01)
+    // CONVERT CELL PARAMETERS (a, b, c, alpha, beta, gamma) TO LATTICE VECTORS
+    // IN RESTRICTED TRICLINIC (LOWER-TRIANGULAR) FORM:
+    //   a = (bx, 0, 0)
+    //   b = (bxy, by, 0)
+    //   c = (bxz, byz, bz)
+    double deg2rad = M_PI / 180.0;
+    double cos_alpha = cos(cell_alpha * deg2rad);
+    double cos_beta  = cos(cell_beta  * deg2rad);
+    double cos_gamma = cos(cell_gamma * deg2rad);
+    double sin_gamma = sin(cell_gamma * deg2rad);
+
+    double bx  = cell_a;
+    double bxy = cell_b * cos_gamma;
+    double by  = cell_b * sin_gamma;
+    double bxz = cell_c * cos_beta;
+    double byz = cell_c * (cos_alpha - cos_beta * cos_gamma) / sin_gamma;
+    double bz  = sqrt(cell_c * cell_c - bxz * bxz - byz * byz);
+
+    if(fabs(bxy) > 0.01 || fabs(bxz) > 0.01 || fabs(byz) > 0.01)
     {
         triclinic_crystal_system = 1;
-        std::cerr << "VoroTop does not currently support non-orthogonal cells." << std::endl;
-        std::cerr << "Cell angles: alpha=" << cell_alpha << " beta=" << cell_beta
-                  << " gamma=" << cell_gamma << std::endl;
-        exit(1);
+        xy = bxy;
+        xz = bxz;
+        yz = byz;
+    }
+    else
+    {
+        triclinic_crystal_system = 0;
+        xy = xz = yz = 0;
     }
 
-    xlo = 0;  xhi = cell_a;
-    ylo = 0;  yhi = cell_b;
-    zlo = 0;  zhi = cell_c;
+    xlo = 0;  xhi = bx;
+    ylo = 0;  yhi = by;
+    zlo = 0;  zhi = bz;
 
     // PHASE 2: EXTRACT SYMMETRY OPERATIONS
     std::vector<SymOp> symops;
@@ -1001,15 +1060,27 @@ static void parse_cif(std::ifstream& fp)
 
     number_of_particles = n_unique;
 
-    // CONVERT FRACTIONAL TO ABSOLUTE COORDINATES AND STORE
+    // CONVERT FRACTIONAL TO CARTESIAN COORDINATES.
+    // FOR LOWER-TRIANGULAR LATTICE MATRIX:
+    //   x = fx*bx + fy*bxy + fz*bxz
+    //   y =         fy*by  + fz*byz
+    //   z =                  fz*bz
+    double Lx = xhi - xlo;  // bx
+    double Ly = yhi - ylo;  // by
+    double Lz = zhi - zlo;  // bz
+
     cif_coordinates.resize(3 * number_of_particles);
     cif_types.resize(number_of_particles);
 
     for(int c = 0; c < number_of_particles; c++)
     {
-        cif_coordinates[3*c]     = xlo + frac_coords[3*c]     * (xhi - xlo);
-        cif_coordinates[3*c + 1] = ylo + frac_coords[3*c + 1] * (yhi - ylo);
-        cif_coordinates[3*c + 2] = zlo + frac_coords[3*c + 2] * (zhi - zlo);
+        double fx = frac_coords[3*c];
+        double fy = frac_coords[3*c + 1];
+        double fz = frac_coords[3*c + 2];
+
+        cif_coordinates[3*c]     = fx * Lx + fy * xy + fz * xz;
+        cif_coordinates[3*c + 1] = fy * Ly + fz * yz;
+        cif_coordinates[3*c + 2] = fz * Lz;
 
         if(species_map.find(atom_species[c]) == species_map.end())
             species_map[atom_species[c]] = next_type++;
@@ -1073,13 +1144,27 @@ static void parse_poscar(std::ifstream& fp)
     for(int i = 0; i < 9; i++)
         v[i] *= scale_factor;
 
-    // CHECK ORTHOGONALITY
-    if(v[1] != 0 || v[2] != 0 || v[3] != 0 || v[5] != 0 || v[6] != 0 || v[7] != 0)
+    // RESTRICTED TRICLINIC REQUIRES LOWER-TRIANGULAR FORM:
+    //   a = (bx, 0, 0), b = (bxy, by, 0), c = (bxz, byz, bz)
+    if(v[1] != 0 || v[2] != 0 || v[5] != 0)
+    {
+        std::cerr << "POSCAR lattice vectors are not in restricted triclinic form." << std::endl;
+        std::cerr << "The first vector must be along x, the second in the xy plane." << std::endl;
+        std::cerr << "Please reorient the lattice vectors." << std::endl;
+        exit(1);
+    }
+
+    if(v[3] != 0 || v[6] != 0 || v[7] != 0)
     {
         triclinic_crystal_system = 1;
-        std::cerr << "VoroTop does not currently support triclinic systems." << std::endl;
-        std::cerr << "Please convert to an orthogonal box." << std::endl;
-        exit(1);
+        xy = v[3];
+        xz = v[6];
+        yz = v[7];
+    }
+    else
+    {
+        triclinic_crystal_system = 0;
+        xy = xz = yz = 0;
     }
 
     xlo = 0;  xhi = v[0];
@@ -1400,27 +1485,65 @@ void import_data()
         if(index_type == -1 && !header_assigned_types.empty())
             type = header_assigned_types[c];
 
-        // CONVERT SCALED/FRACTIONAL COORDINATES TO ABSOLUTE
-        if(scaled_coordinates)
+        if(triclinic_crystal_system)
         {
-            x = xlo + x * Lx;
-            y = ylo + y * Ly;
-            if(dimension == 3) z = zlo + z * Lz;
+            // TRICLINIC: CONVERT AND WRAP USING THE FULL LATTICE MATRIX.
+            // THE LOWER-TRIANGULAR MATRIX IS:
+            //   | Lx  0   0  |
+            //   | xy  Ly  0  |
+            //   | xz  yz  Lz |
+
+            // STEP 1: CONVERT SCALED/FRACTIONAL TO CARTESIAN, OR SHIFT TO ORIGIN
+            if(scaled_coordinates)
+            {
+                double fx = x, fy = y, fz = z;
+                x = fx * Lx + fy * xy + fz * xz;
+                y =           fy * Ly + fz * yz;
+                z =                     fz * Lz;
+            }
+            else
+            {
+                x -= xlo;
+                y -= ylo;
+                z -= zlo;
+            }
+
+            // STEP 2: CARTESIAN → FRACTIONAL (BACK-SUBSTITUTION)
+            double fz = z / Lz;
+            double fy = (y - fz * yz) / Ly;
+            double fx = (x - fy * xy - fz * xz) / Lx;
+
+            // STEP 3: WRAP FRACTIONAL COORDINATES INTO [0, 1)
+            fx = fmod(fx, 1.0); if(fx < 0) fx += 1.0;
+            fy = fmod(fy, 1.0); if(fy < 0) fy += 1.0;
+            fz = fmod(fz, 1.0); if(fz < 0) fz += 1.0;
+
+            // STEP 4: FRACTIONAL → CARTESIAN (ORIGIN AT 0)
+            x = fx * Lx + fy * xy + fz * xz;
+            y =           fy * Ly + fz * yz;
+            z =                     fz * Lz;
         }
-
-        // WRAP COORDINATES INTO PERIODIC BOX.
-        // USES FMOD TO HANDLE UNWRAPPED COORDINATES THAT MAY BE
-        // MULTIPLE BOX LENGTHS OUTSIDE THE BOX.
-        x = xlo + fmod(x - xlo, Lx);
-        if(x < xlo) x += Lx;
-
-        y = ylo + fmod(y - ylo, Ly);
-        if(y < ylo) y += Ly;
-
-        if(dimension == 3)
+        else
         {
-            z = zlo + fmod(z - zlo, Lz);
-            if(z < zlo) z += Lz;
+            // ORTHOGONAL: CONVERT AND WRAP PER AXIS INDEPENDENTLY
+            if(scaled_coordinates)
+            {
+                x = xlo + x * Lx;
+                y = ylo + y * Ly;
+                if(dimension == 3) z = zlo + z * Lz;
+            }
+
+            x = xlo + fmod(x - xlo, Lx);
+            if(x < xlo) x += Lx;
+
+            y = ylo + fmod(y - ylo, Ly);
+            if(y < ylo) y += Ly;
+
+            if(dimension == 3)
+            {
+                z = zlo + fmod(z - zlo, Lz);
+                if(z < zlo) z += Lz;
+            }
         }
 
         // STORE COORDINATES

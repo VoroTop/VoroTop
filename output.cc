@@ -83,10 +83,24 @@ void output_lammps_dump(std::string filename)
         output_file << "0\n";
         output_file << "ITEM: NUMBER OF ATOMS\n";
         output_file << number_of_particles << "\n";
-        output_file << "ITEM: BOX BOUNDS pp pp pp\n";
-        output_file << xlo << " " << xhi << "\n";
-        output_file << ylo << " " << yhi << "\n";
-        output_file << zlo << " " << zhi << "\n";
+        if(triclinic_crystal_system)
+        {
+            output_file << "ITEM: BOX BOUNDS xy xz yz pp pp pp\n";
+            double xlo_bound = xlo + std::min({0.0, xy, xz, xy+xz});
+            double xhi_bound = xhi + std::max({0.0, xy, xz, xy+xz});
+            double ylo_bound = ylo + std::min(0.0, yz);
+            double yhi_bound = yhi + std::max(0.0, yz);
+            output_file << xlo_bound << " " << xhi_bound << " " << xy << "\n";
+            output_file << ylo_bound << " " << yhi_bound << " " << xz << "\n";
+            output_file << zlo       << " " << zhi       << " " << yz << "\n";
+        }
+        else
+        {
+            output_file << "ITEM: BOX BOUNDS pp pp pp\n";
+            output_file << xlo << " " << xhi << "\n";
+            output_file << ylo << " " << yhi << "\n";
+            output_file << zlo << " " << zhi << "\n";
+        }
         output_file << "ITEM: ATOMS id type x y z\tvt ";
         if (r_switch) output_file << "resolved_type ";
         if (c_switch)

@@ -168,18 +168,27 @@ int main(int argc, char *argv[])
     ////////////////////////////////////////////////////////
     
     // Declare pointers for the containers
-    voro::container_2d* con2d = nullptr;
-    voro::container_3d* con3d = nullptr;
+    voro::container_2d*        con2d  = nullptr;
+    voro::container_3d*        con3d  = nullptr;
+    voro::container_triclinic* contri = nullptr;
 
-    // Dynamically allocate the appropriate container based on the dimension
-    if (dimension == 2) 
+    // Dynamically allocate the appropriate container based on dimension and geometry
+    if (dimension == 2)
     {
         con2d = new voro::container_2d(xlo,xhi,ylo,yhi,n_x,n_y,true,true,4,threads);
         if (!con2d) {
             handle_error("Memory allocation for con2d failed.");
         }
     }
-    else    // dimension == 3
+    else if (triclinic_crystal_system)
+    {
+        double bx = xhi - xlo, by_val = yhi - ylo, bz_val = zhi - zlo;
+        contri = new voro::container_triclinic(bx,xy,by_val,xz,yz,bz_val,n_x,n_y,n_z,8,threads);
+        if (!contri) {
+            handle_error("Memory allocation for contri failed.");
+        }
+    }
+    else
     {
         con3d = new voro::container_3d(xlo,xhi,ylo,yhi,zlo,zhi,n_x,n_y,n_z,true,true,true,8,threads);
         if (!con3d) {
@@ -194,7 +203,13 @@ int main(int argc, char *argv[])
             con2d->put_parallel(i, *pp, pp[1]);
         }
         con2d->put_reconcile_overflow();
-    } else if (dimension == 3) {
+    } else if (contri) {
+        for (int i = 0; i < number_of_particles; i++) {
+            double* pp = particle_coordinates + 3 * i;
+            contri->put_parallel(i, *pp, pp[1], pp[2]);
+        }
+        contri->put_reconcile_overflow();
+    } else if (con3d) {
         for (int i = 0; i < number_of_particles; i++) {
             double* pp = particle_coordinates + 3 * i;
             con3d->put_parallel(i, *pp, pp[1], pp[2]);
@@ -219,6 +234,13 @@ int main(int argc, char *argv[])
     ////
     ////////////////////////////////////////////////////
     
+    // HELPER LAMBDA: DISPATCH A 3D OPERATION TO THE CORRECT CONTAINER TYPE
+    // ACCEPTS A CALLABLE THAT TAKES A CONTAINER BY REFERENCE
+    auto dispatch_3d = [&](auto&& func) {
+        if(contri) func(*contri);
+        else       func(*con3d);
+    };
+
     // THESE CALCULATIONS ARE REQUIRED FOR ALL OPTIONS IN 2-DIMENSIONAL SYSTEMS
     if(dimension==2) count_and_store_neighbors_2d(*con2d);
 
@@ -226,17 +248,17 @@ int main(int argc, char *argv[])
     if(vt_switch)
     {
         if     (dimension==2) print_topology_vectors_2d(filename_data);
-        else if(dimension==3) print_topology_vectors_3d(*con3d,filename_data);
+        else if(dimension==3) dispatch_3d([&](auto& con){ print_topology_vectors_3d(con, filename_data); });
     }
-    
+
     // OUTPUTS DISTRIBUTION OF VORONOI TOPOLOGIES
     else if(d_switch)
     {
-        if     (dimension==2) calc_distribution_2d(filter);        
-        else if(dimension==3) calc_distribution_3d(*con3d, filter);
+        if     (dimension==2) calc_distribution_2d(filter);
+        else if(dimension==3) dispatch_3d([&](auto& con){ calc_distribution_3d(con, filter); });
         filter.print_distribution(filename_data);
     }
-        
+
     // OUTPUTS DISTRIBUTION OF VORONOI TOPOLOGIES
     else if(g_switch)
     {
@@ -244,20 +266,20 @@ int main(int argc, char *argv[])
         else if(dimension==3) calc_gaussian_distribution_3d(filter);
         filter.print_distribution(filename_data);
     }
-    
+
     // OUTPUTS PAIR CORRELATION ANALYSIS
-    else if(u_switch || v_switch)  
+    else if(u_switch || v_switch)
     {
-        if(dimension==3) count_and_store_neighbors_3d(*con3d);
+        if(dimension==3) dispatch_3d([](auto& con){ count_and_store_neighbors_3d(con); });
         pair_correlation_analysis();
     }
-    
+
     // OUTPUTS CLUSTER ANALYSIS
     else if(c_switch && !l_switch && !e_switch)
     {
         if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
-        else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
-        if(dimension==3) count_and_store_neighbors_3d(*con3d);
+        else if(dimension==3) dispatch_3d([&](auto& con){ classify_particles_by_voronoi_topology_3d(con, filter); });
+        if(dimension==3) dispatch_3d([](auto& con){ count_and_store_neighbors_3d(con); });
         cluster_analysis();
     }
 
@@ -265,15 +287,15 @@ int main(int argc, char *argv[])
     if(l_switch)
     {
         if     (dimension==2) classify_particles_by_voronoi_topology_2d(filter);
-        else if(dimension==3) classify_particles_by_voronoi_topology_3d(*con3d, filter);
+        else if(dimension==3) dispatch_3d([&](auto& con){ classify_particles_by_voronoi_topology_3d(con, filter); });
         if(c_switch)
         {
-            if(dimension==3) count_and_store_neighbors_3d(*con3d);
+            if(dimension==3) dispatch_3d([](auto& con){ count_and_store_neighbors_3d(con); });
             cluster_analysis();
         }
         output_lammps_dump(filename_data);
     }
-    
+
     else if(e_switch)
     {
         // COLORING SCHEMES 3 REQUIRES CLASSIFYING PARTICLES USING FILTER
@@ -290,7 +312,7 @@ int main(int argc, char *argv[])
 
         output_eps(*con2d,filename_data);
     }
-    
+
     // Clean up dynamically allocated containers
     if (con2d) {
         delete con2d;
@@ -299,6 +321,10 @@ int main(int argc, char *argv[])
     if (con3d) {
         delete con3d;
         con3d = nullptr;
+    }
+    if (contri) {
+        delete contri;
+        contri = nullptr;
     }
     
     cleanup();

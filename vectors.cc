@@ -62,7 +62,8 @@ void count_and_store_neighbors_2d(container_2d& con)
 }
 
 
-void count_and_store_neighbors_3d(container_3d& con)
+template<class Container>
+void count_and_store_neighbors_3d(Container& con)
 {
 #pragma omp parallel for num_threads(threads)
     for(auto cli=con.begin();cli<con.end();cli++)
@@ -82,6 +83,8 @@ void count_and_store_neighbors_3d(container_3d& con)
         }
     }
 }
+template void count_and_store_neighbors_3d(container_3d&);
+template void count_and_store_neighbors_3d(container_triclinic&);
 
 
 void calc_distribution_2d(Filter &filter)
@@ -153,12 +156,13 @@ void calc_distribution_2d(Filter &filter)
 }
 
 
-void calc_distribution_3d(container_3d& con, Filter &filter)
+template<class Container>
+void calc_distribution_3d(Container& con, Filter &filter)
 {
     std::vector<Filter> local_filter(threads);
-    
+
 #pragma omp parallel for num_threads(threads)
-    for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
+    for(auto cli=con.begin();cli<con.end();cli++)
     {
         voronoicell_3d vcell;
         if (con.compute_cell(vcell,cli))
@@ -169,10 +173,12 @@ void calc_distribution_3d(container_3d& con, Filter &filter)
             local_filter[tid].increment_or_add(result.canonical_code,result.chirality,1);
         }
     }
-    
+
     for(int tid=0; tid<threads; tid++)
         filter.copy_filter(local_filter[tid]);
 }
+template void calc_distribution_3d(container_3d&, Filter&);
+template void calc_distribution_3d(container_triclinic&, Filter&);
 
 
 
@@ -280,16 +286,17 @@ void  print_topology_vectors_2d(std::string filename)
 
 
 
-void print_topology_vectors_3d(container_3d& con, std::string filename)
+template<class Container>
+void print_topology_vectors_3d(Container& con, std::string filename)
 {
     std::string vectors_name(filename);
     vectors_name.append(".vectors");
     std::ofstream vector_file(vectors_name.c_str(), std::ofstream::out);
 
     std::vector<stringstream> buf(threads);
-    
+
 #pragma omp parallel for num_threads(threads)
-    for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
+    for(auto cli=con.begin();cli<con.end();cli++)
     {
         voronoicell_3d vcell;
         if (con.compute_cell(vcell,cli))
@@ -334,6 +341,8 @@ void print_topology_vectors_3d(container_3d& con, std::string filename)
     
     vector_file.close();
 }
+template void print_topology_vectors_3d(container_3d&, std::string);
+template void print_topology_vectors_3d(container_triclinic&, std::string);
 
 
 VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
@@ -539,25 +548,28 @@ VoronoiTopology compute_canonical_code_3d(voro::voronoicell_3d& vcell)
 }
 
 
-int classify_particles_by_voronoi_topology_3d(container_3d& con, Filter &filter)
+template<class Container>
+int classify_particles_by_voronoi_topology_3d(Container& con, Filter &filter)
 {
 #pragma omp parallel for num_threads(threads)
-    for(container_3d::iterator cli=con.begin();cli<con.end();cli++)
+    for(auto cli=con.begin();cli<con.end();cli++)
     {
         voronoicell_3d vcell;
         if (con.compute_cell(vcell,cli))
         {
             const int ijk=cli->ijk,q=cli->q;
             const int pid = con.id[ijk][q];
-            
+
             VoronoiTopology result = compute_canonical_code_3d(vcell);
 
             vt_structure_types[pid] = filter.vt_structure_type(result.canonical_code);
         }
     }
-    
+
     return 0;
 }
+template int classify_particles_by_voronoi_topology_3d(container_3d&, Filter&);
+template int classify_particles_by_voronoi_topology_3d(container_triclinic&, Filter&);
 
 
 void classify_particles_by_voronoi_topology_2d(Filter &filter)
