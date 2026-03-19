@@ -176,7 +176,7 @@ VoroTop input_file.dump [options]
 - **Command-line help:** `VoroTop -h` for complete option reference
 - **Example-specific guidance:** Each README.md contains detailed instructions
 - **Troubleshooting:** Common issues and solutions documented in each example
-- **Community support:** [*VoroTop* repository](https://gitlab.com/mLazar/VoroTop/) for questions and discussions
+- **Community support:** [*VoroTop* repository](https://github.com/VoroTop/VoroTop) for questions and discussions
 
 ## Advanced Applications
 

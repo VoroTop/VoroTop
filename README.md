@@ -26,6 +26,7 @@
 ### Features
 
 * **Fast and accurate tessellation:** Quickly perform Voronoi cell topological analysis for large sets of particles using multicore CPUs.
+* **Multiple file formats:** Automatically detects and reads LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, and CIF files. Both orthogonal and triclinic periodic cells are supported.
 * **Customizable analysis:** Extend VoroTop's functionality to perform specialized analyses relevant to your research.
 * **Encapsulated post-script (EPS) images:** Create high-quality vector EPS images of two-dimensional systems.
 * **Cross-platform compatibility:** Designed to compile and run on Linux, macOS, and Unix-like environments.
@@ -87,6 +88,11 @@ After installing `voro++` from the `dev` branch, follow these steps to compile V
     ```
     This will compile the VoroTop executable and place it in a designated `bin/` folder.
 
+    * **Note for macOS:** VoroTop requires OpenMP, which Apple's default Clang compiler does not support. Install GCC via [MacPorts](https://www.macports.org/) or [Homebrew](https://brew.sh/) and specify the compiler when building:
+        ```bash
+        make CXX=g++-mp-15    # MacPorts
+        make CXX=g++-14       # Homebrew (version number may vary)
+        ```
     * **Troubleshooting:** If you encounter compilation errors related to `voro++` headers or libraries, ensure that `voro++` was installed correctly and its header files (`voro++/src/voro++.hh`) and library files are discoverable by your compiler. You might need to set `CPATH` or `LIBRARY_PATH` environment variables, or ensure `sudo make install` correctly placed them.
 
 ---
