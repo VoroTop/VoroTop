@@ -56,9 +56,12 @@ int particle_attributes;
 
 int index_id;
 int index_type;
+int index_species;
 int index_x;
 int index_y;
 int index_z;
+
+std::vector<char> column_types;
 
 std::string   filename_data;
 std::string   filename_filter;

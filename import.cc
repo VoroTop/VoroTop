@@ -26,6 +26,7 @@
 #include <sstream>
 #include <iostream>
 #include <stdexcept>
+#include <map>
 
 #include "filters.hh"
 #include "variables.hh"
@@ -337,12 +338,195 @@ static void parse_lammps_data(std::ifstream& fp)
 
 ////////////////////////////////////////////////////
 ////
+////   PARSE EXTENDED XYZ FILE HEADER.
+////
+////   Line 1: atom count.
+////   Line 2: key=value pairs including Lattice=
+////   (9 numbers: lattice vectors a, b, c) and
+////   Properties= (colon-separated triplets defining
+////   column names, types, and widths).
+////
+////////////////////////////////////////////////////
+
+static void parse_extended_xyz(std::ifstream& fp)
+{
+    std::string line;
+    header_lines = 2;
+    scaled_coordinates = 0;
+    triclinic_crystal_system = 0;
+
+    // LINE 1: ATOM COUNT
+    getline(fp, line);
+    number_of_particles = std::stoi(line);
+
+    // LINE 2: KEY=VALUE PAIRS
+    getline(fp, line);
+
+    // EXTRACT Lattice="..." FROM LINE 2.
+    // THE 9 NUMBERS ARE THREE LATTICE VECTORS a, b, c IN SEQUENCE.
+    size_t lat_pos = line.find("Lattice=");
+    if(lat_pos == std::string::npos)
+        lat_pos = line.find("lattice=");
+
+    if(lat_pos != std::string::npos)
+    {
+        // FIND THE QUOTED VALUE
+        size_t q1 = line.find('"', lat_pos);
+        if(q1 == std::string::npos)
+            throw std::runtime_error("Malformed Lattice= in Extended XYZ (missing opening quote).");
+        size_t q2 = line.find('"', q1 + 1);
+        if(q2 == std::string::npos)
+            throw std::runtime_error("Malformed Lattice= in Extended XYZ (missing closing quote).");
+
+        std::string lattice_str = line.substr(q1 + 1, q2 - q1 - 1);
+        double v[9];
+        std::istringstream lss(lattice_str);
+        for(int i = 0; i < 9; i++)
+        {
+            if(!(lss >> v[i]))
+                throw std::runtime_error("Lattice= must contain 9 numbers.");
+        }
+
+        // LATTICE VECTORS: a = (v[0],v[1],v[2]), b = (v[3],v[4],v[5]), c = (v[6],v[7],v[8])
+        // CHECK IF ORTHOGONAL (ALL OFF-DIAGONAL COMPONENTS ARE ZERO)
+        if(v[1] != 0 || v[2] != 0 || v[3] != 0 || v[5] != 0 || v[6] != 0 || v[7] != 0)
+        {
+            triclinic_crystal_system = 1;
+            std::cerr << "VoroTop does not currently support triclinic systems." << std::endl;
+            std::cerr << "Please convert to an orthogonal box." << std::endl;
+            exit(1);
+        }
+
+        // ORTHOGONAL BOX WITH ORIGIN AT (0,0,0)
+        xlo = 0;  xhi = v[0];
+        ylo = 0;  yhi = v[4];
+        zlo = 0;  zhi = v[8];
+    }
+    else
+    {
+        throw std::runtime_error("Extended XYZ file must contain Lattice= specification.");
+    }
+
+    // EXTRACT Properties="..." FROM LINE 2.
+    // FORMAT: name:type:ncols:name:type:ncols:...
+    // TYPE CODES: S=STRING, R=REAL, I=INTEGER, L=LOGICAL
+    size_t prop_pos = line.find("Properties=");
+    if(prop_pos == std::string::npos)
+        prop_pos = line.find("properties=");
+
+    std::vector<std::string> prop_names;
+    std::vector<char>        prop_types;
+    std::vector<int>         prop_ncols;
+
+    if(prop_pos != std::string::npos)
+    {
+        // FIND THE VALUE (MAY OR MAY NOT BE QUOTED)
+        size_t val_start = prop_pos + 11;  // LENGTH OF "Properties="
+        std::string prop_str;
+
+        if(val_start < line.size() && line[val_start] == '"')
+        {
+            size_t q2 = line.find('"', val_start + 1);
+            if(q2 == std::string::npos)
+                throw std::runtime_error("Malformed Properties= (missing closing quote).");
+            prop_str = line.substr(val_start + 1, q2 - val_start - 1);
+        }
+        else
+        {
+            // UNQUOTED: VALUE RUNS UNTIL NEXT WHITESPACE
+            size_t end = line.find_first_of(" \t", val_start);
+            prop_str = (end != std::string::npos) ? line.substr(val_start, end - val_start) : line.substr(val_start);
+        }
+
+        // PARSE COLON-SEPARATED TRIPLETS
+        std::istringstream pss(prop_str);
+        std::string token;
+        std::vector<std::string> tokens;
+        while(getline(pss, token, ':'))
+            tokens.push_back(token);
+
+        if(tokens.size() % 3 != 0)
+            throw std::runtime_error("Properties= must contain triplets of name:type:ncols.");
+
+        for(size_t i = 0; i < tokens.size(); i += 3)
+        {
+            prop_names.push_back(tokens[i]);
+            char type_char = std::toupper(tokens[i+1][0]);
+            prop_types.push_back(type_char);
+            prop_ncols.push_back(std::stoi(tokens[i+2]));
+        }
+    }
+    else
+    {
+        // NO Properties= FOUND: ASSUME PLAIN XYZ (SPECIES X Y Z)
+        prop_names = {"species", "pos"};
+        prop_types = {'S', 'R'};
+        prop_ncols = {1, 3};
+    }
+
+    // MAP PROPERTIES TO COLUMN INDICES AND BUILD column_types VECTOR
+    index_id      = -1;
+    index_type    = -1;
+    index_species = -1;
+    index_x       = -1;
+    index_y       = -1;
+    index_z       = -1;
+
+    int col = 0;
+    for(size_t i = 0; i < prop_names.size(); i++)
+    {
+        std::string name = prop_names[i];
+
+        // CONVERT NAME TO LOWERCASE FOR MATCHING
+        std::string lname = name;
+        for(char& ch : lname) ch = std::tolower(ch);
+
+        if(lname == "species" || lname == "element" || lname == "symbol")
+        {
+            index_species = col;
+        }
+        else if(lname == "z" && prop_types[i] == 'I' && prop_ncols[i] == 1)
+        {
+            // ATOMIC NUMBER — TREAT AS TYPE
+            index_type = col;
+        }
+        else if(lname == "pos" || lname == "positions")
+        {
+            index_x = col;
+            index_y = col + 1;
+            if(prop_ncols[i] >= 3)
+                index_z = col + 2;
+        }
+        else if(lname == "id")
+        {
+            index_id = col;
+        }
+
+        // ADD COLUMN TYPES FOR EACH COLUMN IN THIS PROPERTY
+        for(int j = 0; j < prop_ncols[i]; j++)
+            column_types.push_back(prop_types[i]);
+
+        col += prop_ncols[i];
+    }
+
+    particle_attributes = col;
+
+    if(index_x == -1 || index_y == -1)
+        throw std::runtime_error("Extended XYZ file must contain position data (pos:R:3).");
+
+    if(index_z == -1) dimension = 2;
+}
+
+
+////////////////////////////////////////////////////
+////
 ////   PARSE HEADER: DETECT FILE FORMAT AND DISPATCH
 ////   TO THE APPROPRIATE PARSER.
 ////
-////   LAMMPS dump files are identified by "ITEM:" on
-////   the first non-blank line.  All other files are
-////   assumed to be LAMMPS data files.
+////   LAMMPS dump: identified by "ITEM:" on line 1.
+////   Extended XYZ: line 1 is an integer, line 2
+////   contains "Lattice=" or "Properties=".
+////   Otherwise: assumed to be LAMMPS data file.
 ////
 ////////////////////////////////////////////////////
 
@@ -351,15 +535,24 @@ void parse_header(std::ifstream& fp)
     if (!fp.is_open())
         throw std::runtime_error("Error opening file");
 
-    // READ FIRST LINE TO DETECT FILE FORMAT
-    std::string first_line;
+    // READ FIRST TWO LINES TO DETECT FILE FORMAT
+    std::string first_line, second_line;
     getline(fp, first_line);
+    getline(fp, second_line);
     fp.seekg(0);  // REWIND
 
     if (first_line.find("ITEM:") != std::string::npos)
     {
         file_format = 0;  // LAMMPS DUMP
         parse_lammps_dump(fp);
+    }
+    else if (second_line.find("Lattice=")   != std::string::npos ||
+             second_line.find("lattice=")   != std::string::npos ||
+             second_line.find("Properties=") != std::string::npos ||
+             second_line.find("properties=") != std::string::npos)
+    {
+        file_format = 2;  // EXTENDED XYZ
+        parse_extended_xyz(fp);
     }
     else
     {
@@ -413,8 +606,8 @@ void parse_header(std::ifstream& fp)
 ////
 ////   IMPORT PARTICLE DATA FROM FILE.
 ////   HANDLES ABSOLUTE, SCALED, AND UNWRAPPED
-////   COORDINATE TYPES.  WORKS FOR BOTH LAMMPS
-////   DUMP AND DATA FILE FORMATS.
+////   COORDINATE TYPES.  WORKS FOR LAMMPS DUMP,
+////   LAMMPS DATA, AND EXTENDED XYZ FILE FORMATS.
 ////
 ////////////////////////////////////////////////////
 
@@ -432,22 +625,41 @@ void import_data()
     double Ly = yhi - ylo;
     double Lz = zhi - zlo;
 
+    // SPECIES-TO-TYPE MAPPING FOR EXTENDED XYZ FILES.
+    // EACH UNIQUE SPECIES STRING IS ASSIGNED A SEQUENTIAL INTEGER TYPE.
+    std::map<std::string, int> species_map;
+    int next_type = 1;
+
     for(int c = 0; c < number_of_particles; c++)
     {
         int id = c + 1;
         int type = 1;
         double x = 0, y = 0, z = 0;
         double junk;
+        char str_buf[256];
 
         for(int d = 0; d < particle_attributes; d++)
         {
             int result;
-            if     (d == index_id)   result = fscanf(in_file, "%d",  &id);
-            else if(d == index_type) result = fscanf(in_file, "%d",  &type);
-            else if(d == index_x)    result = fscanf(in_file, "%lg", &x);
-            else if(d == index_y)    result = fscanf(in_file, "%lg", &y);
-            else if(d == index_z)    result = fscanf(in_file, "%lg", &z);
-            else                     result = fscanf(in_file, "%lg", &junk);
+            if     (d == index_id)      result = fscanf(in_file, "%d",  &id);
+            else if(d == index_type)    result = fscanf(in_file, "%d",  &type);
+            else if(d == index_species)
+            {
+                result = fscanf(in_file, "%255s", str_buf);
+                if(result == 1)
+                {
+                    std::string species(str_buf);
+                    if(species_map.find(species) == species_map.end())
+                        species_map[species] = next_type++;
+                    type = species_map[species];
+                }
+            }
+            else if(d == index_x)       result = fscanf(in_file, "%lg", &x);
+            else if(d == index_y)       result = fscanf(in_file, "%lg", &y);
+            else if(d == index_z)       result = fscanf(in_file, "%lg", &z);
+            else if(!column_types.empty() && d < (int)column_types.size() && column_types[d] == 'S')
+                                        result = fscanf(in_file, "%255s", str_buf);
+            else                        result = fscanf(in_file, "%lg", &junk);
 
             if (result != 1)
                 throw std::runtime_error("Error reading particle data from file");
