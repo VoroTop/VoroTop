@@ -863,7 +863,30 @@ static void parse_cif(std::ifstream& fp)
     ylo = 0;  yhi = by;
     zlo = 0;  zhi = bz;
 
-    // PHASE 2: EXTRACT SYMMETRY OPERATIONS
+    // PHASE 2: EXTRACT SPACE GROUP CENTERING AND SYMMETRY OPERATIONS
+
+    // EXTRACT SPACE GROUP NAME TO DETERMINE CENTERING TYPE
+    char centering = 'P';  // DEFAULT: PRIMITIVE
+    for(size_t i = 0; i < lines.size(); i++)
+    {
+        std::vector<std::string> tok = tokenize_cif_line(lines[i]);
+        if(tok.size() >= 2 &&
+           (tok[0] == "_symmetry_space_group_name_H-M" ||
+            tok[0] == "_space_group_name_H-M_alt"))
+        {
+            // EXTRACT FIRST NON-WHITESPACE CHARACTER OF THE SPACE GROUP SYMBOL
+            for(char ch : tok[1])
+            {
+                if(ch != ' ' && ch != '\t')
+                {
+                    centering = std::toupper(ch);
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
     std::vector<SymOp> symops;
 
     for(size_t i = 0; i < lines.size(); i++)
@@ -929,6 +952,82 @@ static void parse_cif(std::ifstream& fp)
         SymOp identity = {};
         identity.rot[0][0] = identity.rot[1][1] = identity.rot[2][2] = 1.0;
         symops.push_back(identity);
+    }
+
+    // EXPAND SYMMETRY OPERATIONS WITH LATTICE CENTERING TRANSLATIONS.
+    // SOME CIF FILES LIST ONLY THE POINT GROUP OPERATIONS WITHOUT INCLUDING
+    // THE CENTERING TRANSLATIONS.  WE DETECT THE CENTERING TYPE FROM THE
+    // SPACE GROUP NAME AND ADD MISSING TRANSLATIONS.
+    //
+    // CENTERING TYPES AND THEIR TRANSLATIONS:
+    //   I (BODY):   (1/2, 1/2, 1/2)
+    //   F (FACE):   (1/2, 1/2, 0), (1/2, 0, 1/2), (0, 1/2, 1/2)
+    //   A (A-FACE): (0, 1/2, 1/2)
+    //   B (B-FACE): (1/2, 0, 1/2)
+    //   C (C-FACE): (1/2, 1/2, 0)
+    //   R (RHOMBOHEDRAL): (2/3, 1/3, 1/3), (1/3, 2/3, 2/3)
+    //   P (PRIMITIVE): NO ADDITIONAL TRANSLATIONS
+
+    struct CenteringTranslation { double t[3]; };
+    std::vector<CenteringTranslation> centering_translations;
+
+    if(centering == 'I')
+        centering_translations = {{{0.5, 0.5, 0.5}}};
+    else if(centering == 'F')
+        centering_translations = {{{0.5, 0.5, 0.0}}, {{0.5, 0.0, 0.5}}, {{0.0, 0.5, 0.5}}};
+    else if(centering == 'A')
+        centering_translations = {{{0.0, 0.5, 0.5}}};
+    else if(centering == 'B')
+        centering_translations = {{{0.5, 0.0, 0.5}}};
+    else if(centering == 'C')
+        centering_translations = {{{0.5, 0.5, 0.0}}};
+    else if(centering == 'R')
+        centering_translations = {{{2.0/3, 1.0/3, 1.0/3}}, {{1.0/3, 2.0/3, 2.0/3}}};
+
+    if(!centering_translations.empty())
+    {
+        // CHECK WHETHER THE CENTERING TRANSLATIONS ARE ALREADY PRESENT IN THE
+        // SYMMETRY OPERATIONS.  WE TEST THE FIRST CENTERING TRANSLATION: IF AN
+        // OPERATION WITH THE IDENTITY ROTATION AND THAT TRANSLATION EXISTS, THE
+        // CIF ALREADY INCLUDES THE EXPANDED SET.
+        bool already_expanded = false;
+        double ct0 = centering_translations[0].t[0];
+        double ct1 = centering_translations[0].t[1];
+        double ct2 = centering_translations[0].t[2];
+
+        for(const auto& op : symops)
+        {
+            // CHECK IF THIS IS IDENTITY ROTATION + CENTERING TRANSLATION
+            if(fabs(op.rot[0][0] - 1.0) < 1e-6 && fabs(op.rot[1][1] - 1.0) < 1e-6 &&
+               fabs(op.rot[2][2] - 1.0) < 1e-6 &&
+               fabs(op.rot[0][1]) < 1e-6 && fabs(op.rot[0][2]) < 1e-6 &&
+               fabs(op.rot[1][0]) < 1e-6 && fabs(op.rot[1][2]) < 1e-6 &&
+               fabs(op.rot[2][0]) < 1e-6 && fabs(op.rot[2][1]) < 1e-6 &&
+               fabs(fmod(op.trans[0] - ct0 + 10.0, 1.0)) < 1e-6 &&
+               fabs(fmod(op.trans[1] - ct1 + 10.0, 1.0)) < 1e-6 &&
+               fabs(fmod(op.trans[2] - ct2 + 10.0, 1.0)) < 1e-6)
+            {
+                already_expanded = true;
+                break;
+            }
+        }
+
+        if(!already_expanded)
+        {
+            // DUPLICATE EACH EXISTING OPERATION WITH EACH CENTERING TRANSLATION
+            size_t orig_size = symops.size();
+            for(const auto& ct : centering_translations)
+            {
+                for(size_t s = 0; s < orig_size; s++)
+                {
+                    SymOp new_op = symops[s];
+                    new_op.trans[0] += ct.t[0];
+                    new_op.trans[1] += ct.t[1];
+                    new_op.trans[2] += ct.t[2];
+                    symops.push_back(new_op);
+                }
+            }
+        }
     }
 
     // PHASE 3: EXTRACT ATOM SITE POSITIONS
