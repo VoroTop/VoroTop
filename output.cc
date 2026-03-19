@@ -43,50 +43,90 @@ void output_lammps_dump(std::string filename)
     std::string full_line;
     data_file.open(filename_data, std::ifstream::in);
 
-    
+
     ////////////////////////////////////////////////////
     ////
     ////    PRINT HEADER INFO TO FILE
     ////
     ////////////////////////////////////////////////////
-    
-    for (int c = 0; c < header_lines; ++c)
+
+    if (file_format == 0)
     {
-        getline(data_file, full_line);
-        output_file << full_line;
-        if (full_line.find("ITEM: ATOMS") == 0)
+        // LAMMPS DUMP: COPY ORIGINAL HEADER, APPENDING VOROTOP COLUMNS
+        for (int c = 0; c < header_lines; ++c)
         {
-            output_file << "\tvt ";
-            
-            if (r_switch) output_file << "resolved_type ";
-            if (c_switch)
+            getline(data_file, full_line);
+            output_file << full_line;
+            if (full_line.find("ITEM: ATOMS") == 0)
             {
-                output_file << "cluster_index ";
-                output_file << "cluster_size ";
+                output_file << "\tvt ";
+                if (r_switch) output_file << "resolved_type ";
+                if (c_switch)
+                {
+                    output_file << "cluster_index ";
+                    output_file << "cluster_size ";
+                }
+                output_file << '\n';
             }
-            output_file << '\n';
+            else
+                output_file << '\n';
         }
-        else
-            output_file << '\n';
     }
-    
-    
+    else
+    {
+        // LAMMPS DATA FILE: GENERATE A PROPER DUMP HEADER
+        // SKIP PAST THE ORIGINAL HEADER TO REACH ATOM DATA
+        for (int c = 0; c < header_lines; ++c)
+            getline(data_file, full_line);
+
+        output_file << "ITEM: TIMESTEP\n";
+        output_file << "0\n";
+        output_file << "ITEM: NUMBER OF ATOMS\n";
+        output_file << number_of_particles << "\n";
+        output_file << "ITEM: BOX BOUNDS pp pp pp\n";
+        output_file << xlo << " " << xhi << "\n";
+        output_file << ylo << " " << yhi << "\n";
+        output_file << zlo << " " << zhi << "\n";
+        output_file << "ITEM: ATOMS id type x y z\tvt ";
+        if (r_switch) output_file << "resolved_type ";
+        if (c_switch)
+        {
+            output_file << "cluster_index ";
+            output_file << "cluster_size ";
+        }
+        output_file << "\n";
+    }
+
+
     ////////////////////////////////////////////////////
     ////
     ////    PRINT PARTICLE DATA TO FILE
     ////
     ////////////////////////////////////////////////////
-    
+
     for (int c = 0; c < number_of_particles; ++c)
     {
-        // OUTPUT INITIAL DATA
-        getline(data_file, full_line);
-        
-        output_file << full_line << '\t';
-        
+        if (file_format == 0)
+        {
+            // LAMMPS DUMP: COPY ORIGINAL LINE
+            getline(data_file, full_line);
+            output_file << full_line << '\t';
+        }
+        else
+        {
+            // LAMMPS DATA: WRITE FROM PARSED DATA (id type x y z)
+            output_file << particle_ids[c] << ' '
+                        << particle_types[c] << ' '
+                        << particle_coordinates[dimension * c] << ' '
+                        << particle_coordinates[dimension * c + 1];
+            if (dimension == 3)
+                output_file << ' ' << particle_coordinates[dimension * c + 2];
+            output_file << '\t';
+        }
+
         // OUTPUT VORONOI TOPOLOGY
         output_file << vt_structure_types[c] << '\t';
-        
+
         // OUTPUT RESOLVED TYPE AND CLUSTER INFORMATION, AS SPECIFIED
         if (r_switch) output_file << vt_structure_types_resolved[c] << '\t';
         if (c_switch)
@@ -94,10 +134,10 @@ void output_lammps_dump(std::string filename)
             output_file << cluster_index[c] << '\t';
             output_file << cluster_sizes[c] << '\t';
         }
-        
+
         output_file << '\n';
     }
-    
+
     data_file.close();
 }
 

@@ -50,10 +50,12 @@ int particles_in_eps;
 int perturbation_samples;
 double perturbation_size;
 
+int file_format;
 int header_lines;
 int particle_attributes;
 
 int index_id;
+int index_type;
 int index_x;
 int index_y;
 int index_z;
@@ -63,6 +65,7 @@ std::string   filename_filter;
 std::ifstream data_file;
 
 int*    particle_ids;
+int*    particle_types;
 double* particle_coordinates;
 
 std::vector<int> cluster_index;

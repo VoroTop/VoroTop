@@ -42,6 +42,10 @@ void cleanup() {
         delete[] particle_ids;
         particle_ids = nullptr;
     }
+    if (particle_types) {
+        delete[] particle_types;
+        particle_types = nullptr;
+    }
 }
 
 
@@ -99,7 +103,13 @@ int main(int argc, char *argv[])
         handle_error("Memory allocation for particle_ids failed.");
         exit(0);
     }
-    
+
+    particle_types      =new    int[number_of_particles];
+    if (!particle_types) {
+        handle_error("Memory allocation for particle_types failed.");
+        exit(0);
+    }
+
     particle_coordinates=new double[number_of_particles*dimension];
     if (!particle_coordinates) {
         handle_error("Memory allocation for particle_coordinates failed.");

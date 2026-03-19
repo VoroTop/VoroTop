@@ -50,10 +50,12 @@ extern int particles_in_eps;
 extern int perturbation_samples;
 extern double perturbation_size;
 
+extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA
 extern int header_lines;
 extern int particle_attributes;
 
 extern int index_id;
+extern int index_type;
 extern int index_x;
 extern int index_y;
 extern int index_z;
@@ -63,6 +65,7 @@ extern std::string   filename_filter;
 extern std::ifstream data_file;
 
 extern int*    particle_ids;
+extern int*    particle_types;
 extern double* particle_coordinates;
 
 extern std::vector<int> cluster_index;
