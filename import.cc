@@ -520,12 +520,183 @@ static void parse_extended_xyz(std::ifstream& fp)
 
 ////////////////////////////////////////////////////
 ////
+////   PARSE VASP POSCAR/CONTCAR FILE.
+////
+////   Line 1: comment.
+////   Line 2: universal scale factor.
+////   Lines 3-5: lattice vectors (3x3).
+////   Line 6: species names (VASP 5+) or atom counts.
+////   Line 7: atom counts (if line 6 was species names).
+////   Optional: "Selective dynamics".
+////   Next line: "Direct" or "Cartesian".
+////
+////////////////////////////////////////////////////
+
+static void parse_poscar(std::ifstream& fp)
+{
+    std::string line;
+    scaled_coordinates = 0;
+    triclinic_crystal_system = 0;
+    header_lines = 0;
+
+    // LINE 1: COMMENT (SKIP)
+    getline(fp, line);
+    header_lines++;
+
+    // LINE 2: SCALE FACTOR
+    getline(fp, line);
+    header_lines++;
+    double scale_factor = std::stod(line);
+
+    // LINES 3-5: LATTICE VECTORS
+    double v[9];
+    for(int i = 0; i < 3; i++)
+    {
+        getline(fp, line);
+        header_lines++;
+        std::istringstream iss(line);
+        if(!(iss >> v[3*i] >> v[3*i+1] >> v[3*i+2]))
+            throw std::runtime_error("POSCAR: could not read lattice vector on line " + std::to_string(header_lines) + ".");
+    }
+
+    // HANDLE NEGATIVE SCALE FACTOR (VALUE IS DESIRED CELL VOLUME)
+    if(scale_factor < 0)
+    {
+        double vol = v[0]*(v[4]*v[8] - v[5]*v[7])
+                   - v[1]*(v[3]*v[8] - v[5]*v[6])
+                   + v[2]*(v[3]*v[7] - v[4]*v[6]);
+        if(vol < 0) vol = -vol;
+        scale_factor = pow(fabs(scale_factor) / vol, 1.0/3.0);
+    }
+
+    // SCALE LATTICE VECTORS
+    for(int i = 0; i < 9; i++)
+        v[i] *= scale_factor;
+
+    // CHECK ORTHOGONALITY
+    if(v[1] != 0 || v[2] != 0 || v[3] != 0 || v[5] != 0 || v[6] != 0 || v[7] != 0)
+    {
+        triclinic_crystal_system = 1;
+        std::cerr << "VoroTop does not currently support triclinic systems." << std::endl;
+        std::cerr << "Please convert to an orthogonal box." << std::endl;
+        exit(1);
+    }
+
+    xlo = 0;  xhi = v[0];
+    ylo = 0;  yhi = v[4];
+    zlo = 0;  zhi = v[8];
+
+    // LINE 6: SPECIES NAMES (VASP 5+) OR ATOM COUNTS.
+    // IF THE FIRST TOKEN IS NOT A NUMBER, THIS LINE CONTAINS SPECIES NAMES
+    // AND THE NEXT LINE CONTAINS ATOM COUNTS.
+    getline(fp, line);
+    header_lines++;
+
+    std::vector<int> atom_counts;
+    std::istringstream iss6(line);
+    std::string token;
+    iss6 >> token;
+
+    bool is_number = !token.empty() && (std::isdigit(token[0]) || token[0] == '-' || token[0] == '+');
+    if(is_number)
+    {
+        // LINE 6 CONTAINS ATOM COUNTS DIRECTLY (PRE-VASP5 FORMAT)
+        atom_counts.push_back(std::stoi(token));
+        int count;
+        while(iss6 >> count)
+            atom_counts.push_back(count);
+    }
+    else
+    {
+        // LINE 6 CONTAINS SPECIES NAMES; LINE 7 HAS ATOM COUNTS
+        getline(fp, line);
+        header_lines++;
+        std::istringstream iss7(line);
+        int count;
+        while(iss7 >> count)
+            atom_counts.push_back(count);
+    }
+
+    if(atom_counts.empty())
+        throw std::runtime_error("POSCAR: no atom counts found.");
+
+    // COMPUTE TOTAL PARTICLES AND BUILD TYPE ARRAY FROM HEADER
+    number_of_particles = 0;
+    for(int c : atom_counts)
+        number_of_particles += c;
+
+    header_assigned_types.resize(number_of_particles);
+    int idx = 0;
+    for(int t = 0; t < (int)atom_counts.size(); t++)
+        for(int j = 0; j < atom_counts[t]; j++)
+            header_assigned_types[idx++] = t + 1;
+
+    // CHECK FOR OPTIONAL "Selective dynamics" LINE.
+    // THIS LINE STARTS WITH 'S' OR 's'; COORDINATE TYPE LINES START WITH
+    // 'D'/'d' (DIRECT) OR 'C'/'c'/'K'/'k' (CARTESIAN).
+    getline(fp, line);
+    header_lines++;
+
+    bool selective_dynamics = false;
+    size_t start = line.find_first_not_of(" \t\r");
+    if(start != std::string::npos && std::tolower(line[start]) == 's')
+    {
+        selective_dynamics = true;
+        getline(fp, line);
+        header_lines++;
+        start = line.find_first_not_of(" \t\r");
+    }
+
+    // COORDINATE TYPE: "Direct" (FRACTIONAL) OR "Cartesian"/"Kartesian"
+    if(start == std::string::npos)
+        throw std::runtime_error("POSCAR: missing coordinate type line.");
+
+    char first = std::tolower(line[start]);
+    if(first == 'd')
+    {
+        scaled_coordinates = 1;
+        coordinate_scale = 1.0;
+    }
+    else if(first == 'c' || first == 'k')
+    {
+        scaled_coordinates = 0;
+        coordinate_scale = scale_factor;
+    }
+    else
+    {
+        throw std::runtime_error("POSCAR: expected 'Direct' or 'Cartesian', got: " + line);
+    }
+
+    // SET COLUMN INDICES (POSCAR ATOM LINES: x y z [T T T])
+    index_id      = -1;
+    index_type    = -1;
+    index_species = -1;
+    index_x       = 0;
+    index_y       = 1;
+    index_z       = 2;
+
+    if(selective_dynamics)
+    {
+        particle_attributes = 6;
+        column_types = {'R', 'R', 'R', 'S', 'S', 'S'};
+    }
+    else
+    {
+        particle_attributes = 3;
+    }
+}
+
+
+////////////////////////////////////////////////////
+////
 ////   PARSE HEADER: DETECT FILE FORMAT AND DISPATCH
 ////   TO THE APPROPRIATE PARSER.
 ////
 ////   LAMMPS dump: identified by "ITEM:" on line 1.
-////   Extended XYZ: line 1 is an integer, line 2
-////   contains "Lattice=" or "Properties=".
+////   Extended XYZ: line 2 contains "Lattice=" or
+////   "Properties=".
+////   POSCAR: line 2 is a single number and lines 3-5
+////   each contain exactly 3 numbers.
 ////   Otherwise: assumed to be LAMMPS data file.
 ////
 ////////////////////////////////////////////////////
@@ -535,24 +706,45 @@ void parse_header(std::ifstream& fp)
     if (!fp.is_open())
         throw std::runtime_error("Error opening file");
 
-    // READ FIRST TWO LINES TO DETECT FILE FORMAT
-    std::string first_line, second_line;
-    getline(fp, first_line);
-    getline(fp, second_line);
+    // READ FIRST FIVE LINES TO DETECT FILE FORMAT.
+    // CLEAR EOF BIT BEFORE REWINDING (FILE MAY HAVE FEWER THAN 5 LINES).
+    std::string detect_lines[5];
+    for(int i = 0; i < 5; i++)
+        getline(fp, detect_lines[i]);
+    fp.clear();
     fp.seekg(0);  // REWIND
 
-    if (first_line.find("ITEM:") != std::string::npos)
+    if (detect_lines[0].find("ITEM:") != std::string::npos)
     {
         file_format = 0;  // LAMMPS DUMP
         parse_lammps_dump(fp);
     }
-    else if (second_line.find("Lattice=")   != std::string::npos ||
-             second_line.find("lattice=")   != std::string::npos ||
-             second_line.find("Properties=") != std::string::npos ||
-             second_line.find("properties=") != std::string::npos)
+    else if (detect_lines[1].find("Lattice=")   != std::string::npos ||
+             detect_lines[1].find("lattice=")   != std::string::npos ||
+             detect_lines[1].find("Properties=") != std::string::npos ||
+             detect_lines[1].find("properties=") != std::string::npos)
     {
         file_format = 2;  // EXTENDED XYZ
         parse_extended_xyz(fp);
+    }
+    else if ([&]() -> bool {
+        // POSCAR: LINE 2 IS A SINGLE NUMBER, LINES 3-5 EACH HAVE EXACTLY 3 NUMBERS
+        double val;
+        std::istringstream iss2(detect_lines[1]);
+        std::string extra;
+        if(!(iss2 >> val) || (iss2 >> extra)) return false;
+
+        for(int i = 2; i <= 4; i++)
+        {
+            double a, b, c;
+            std::istringstream iss(detect_lines[i]);
+            if(!(iss >> a >> b >> c) || (iss >> extra)) return false;
+        }
+        return true;
+    }())
+    {
+        file_format = 3;  // POSCAR
+        parse_poscar(fp);
     }
     else
     {
@@ -607,7 +799,7 @@ void parse_header(std::ifstream& fp)
 ////   IMPORT PARTICLE DATA FROM FILE.
 ////   HANDLES ABSOLUTE, SCALED, AND UNWRAPPED
 ////   COORDINATE TYPES.  WORKS FOR LAMMPS DUMP,
-////   LAMMPS DATA, AND EXTENDED XYZ FILE FORMATS.
+////   LAMMPS DATA, EXTENDED XYZ, AND POSCAR FORMATS.
 ////
 ////////////////////////////////////////////////////
 
@@ -664,6 +856,15 @@ void import_data()
             if (result != 1)
                 throw std::runtime_error("Error reading particle data from file");
         }
+
+        // APPLY COORDINATE SCALE (FOR POSCAR CARTESIAN MODE)
+        x *= coordinate_scale;
+        y *= coordinate_scale;
+        if(dimension == 3) z *= coordinate_scale;
+
+        // USE HEADER-ASSIGNED TYPES (FOR POSCAR)
+        if(index_type == -1 && !header_assigned_types.empty())
+            type = header_assigned_types[c];
 
         // CONVERT SCALED/FRACTIONAL COORDINATES TO ABSOLUTE
         if(scaled_coordinates)

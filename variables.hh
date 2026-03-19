@@ -50,7 +50,7 @@ extern int particles_in_eps;
 extern int perturbation_samples;
 extern double perturbation_size;
 
-extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA, 2 = EXTENDED XYZ
+extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA, 2 = EXTENDED XYZ, 3 = POSCAR
 extern int header_lines;
 extern int particle_attributes;
 
@@ -62,6 +62,9 @@ extern int index_y;
 extern int index_z;
 
 extern std::vector<char> column_types;  // PER-COLUMN TYPE: 'S'=STRING, 'R'=REAL, 'I'=INT
+
+extern std::vector<int> header_assigned_types;  // PRE-ASSIGNED TYPES FROM FILE HEADER (POSCAR)
+extern double coordinate_scale;                 // COORDINATE MULTIPLIER (POSCAR CARTESIAN MODE)
 
 extern std::string   filename_data;
 extern std::string   filename_filter;

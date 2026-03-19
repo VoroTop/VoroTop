@@ -63,6 +63,9 @@ int index_z;
 
 std::vector<char> column_types;
 
+std::vector<int> header_assigned_types;
+double coordinate_scale = 1.0;
+
 std::string   filename_data;
 std::string   filename_filter;
 std::ifstream data_file;
