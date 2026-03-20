@@ -104,9 +104,18 @@ void help_message(void) {
     "           6: Particles colored according to crystal cluster ID                    \n"
     "           7: Particles colored according to defect cluster size                   \n"
     "           8: Particles colored according to crystal cluster size                  \n"
-    "                                                                                   \n"   
+    " -n   : Do not draw Voronoi cells in EPS output; only draw particles.             \n"
+    "                                                                                   \n"
+    " -u   : Compute unnormalized Voronoi pair correlation function.  Takes an optional  \n"
+    "        argument specifying the maximal Voronoi distance (default: 10).            \n"
+    " -v   : Compute normalized Voronoi pair correlation function.  Takes an optional   \n"
+    "        argument specifying the maximal Voronoi distance (default: 10).            \n"
+    "        Normalization constants are available up to distance 20.                   \n"
+    "                                                                                   \n"
     " -t   : Specify number of threads to use; if not specified, then this number will  \n"
     "        be set to one fewer than the number of processors available.               \n"
+    "                                                                                   \n"
+    " -h   : Display this help message.                                                 \n"
     "                                                                                   \n";
 }
 
