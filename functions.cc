@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 1.0)              *   ////
+////   *             (Version 1.1)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *          Bar Ilan University           *   ////
@@ -37,7 +37,7 @@ void help_message(void) {
     "   *                                          *\n"
     "   *      VoroTop: Voronoi Cell Topology      *\n"
     "   *    Visualization and Analysis Toolkit    *\n"
-    "   *              (Version 1.0)               *\n"
+    "   *              (Version 1.1)               *\n"
     "   *                                          *\n"
     "   *            Emanuel A. Lazar              *\n"
     "   *           Bar Ilan University            *\n"
@@ -51,7 +51,8 @@ void help_message(void) {
     "         topology for each point.  Output is determined by options.              \n"
     "                                                                                 \n"
     "Supported file formats (auto-detected):                                          \n"
-    "         LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, and CIF.  \n"
+    "         LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, CIF,      \n"
+    "         and AtomEye Extended CFG.                                              \n"
     "         Both orthogonal and triclinic periodic cells are supported.  CIF files  \n"
     "         are processed with full symmetry expansion; lattice centering (I, F, A, \n"
     "         B, C, R) is automatically applied when not already included in the      \n"

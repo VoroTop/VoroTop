@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 1.0)              *   ////
+////   *             (Version 1.1)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *          Bar Ilan University           *   ////
@@ -1373,12 +1373,251 @@ static void parse_poscar(std::ifstream& fp)
 
 ////////////////////////////////////////////////////
 ////
+////   PARSE ATOMEYE EXTENDED CFG FILE.
+////
+////   The AtomEye Extended CFG format begins with
+////   header lines specifying the number of particles,
+////   lattice vectors (H0), a scale factor (A), and
+////   auxiliary property definitions.  Coordinates are
+////   always fractional.
+////
+////   Because species markers (mass + symbol lines)
+////   are interspersed with coordinate data, this
+////   parser reads all data during header parsing and
+////   stores results via data_already_imported.
+////
+////////////////////////////////////////////////////
+
+static void parse_atomeye_cfg(std::ifstream& fp)
+{
+    std::string line;
+    scaled_coordinates = 1;
+    triclinic_crystal_system = 0;
+    data_already_imported = true;
+
+    // LATTICE VECTORS (3x3 MATRIX, ROW-MAJOR)
+    double H[3][3] = {};
+    double scale = 1.0;
+    int entry_count = 0;
+    bool no_velocity = false;
+
+    // PARSE HEADER LINES UNTIL entry_count IS FOUND
+    while(getline(fp, line))
+    {
+        // SKIP BLANK LINES AND COMMENTS
+        size_t start = line.find_first_not_of(" \t\r");
+        if(start == std::string::npos) continue;
+        if(line[start] == '#') continue;
+
+        if(line.find("Number of particles") != std::string::npos)
+        {
+            size_t eq = line.find('=');
+            if(eq != std::string::npos)
+                number_of_particles = std::stoi(line.substr(eq + 1));
+        }
+        else if(line.find("A =") != std::string::npos)
+        {
+            size_t eq = line.find('=');
+            if(eq != std::string::npos)
+                scale = std::stod(line.substr(eq + 1));
+        }
+        else if(line.find("H0(") != std::string::npos)
+        {
+            // FORMAT: H0(i,j) = value [A]
+            // INDICES ARE 1-BASED
+            size_t p1 = line.find('(');
+            size_t p2 = line.find(')');
+            if(p1 != std::string::npos && p2 != std::string::npos)
+            {
+                std::string indices = line.substr(p1 + 1, p2 - p1 - 1);
+                int i, j;
+                char comma;
+                std::istringstream iss(indices);
+                iss >> i >> comma >> j;
+
+                size_t eq = line.find('=');
+                if(eq != std::string::npos)
+                {
+                    double value;
+                    std::istringstream vss(line.substr(eq + 1));
+                    vss >> value;
+                    H[i - 1][j - 1] = value;
+                }
+            }
+        }
+        else if(line.find(".NO_VELOCITY.") != std::string::npos)
+        {
+            no_velocity = true;
+        }
+        else if(line.find("entry_count") != std::string::npos)
+        {
+            size_t eq = line.find('=');
+            if(eq != std::string::npos)
+                entry_count = std::stoi(line.substr(eq + 1));
+            break;  // STOP READING HEADER AFTER entry_count
+        }
+    }
+
+    // APPLY SCALE FACTOR TO LATTICE VECTORS
+    for(int i = 0; i < 3; i++)
+        for(int j = 0; j < 3; j++)
+            H[i][j] *= scale;
+
+    // THE ATOMEYE CONVENTION STORES LATTICE VECTORS AS COLUMNS OF H0
+    // (JU LI, MODELLING SIMUL. MATER. SCI. ENG. 11, 2003), BUT SOME
+    // TOOLS (E.G. ASE) WRITE THEM AS ROWS.  FOR RESTRICTED TRICLINIC,
+    // THE COLUMN CONVENTION GIVES AN UPPER-TRIANGULAR MATRIX AND THE
+    // ROW CONVENTION GIVES A LOWER-TRIANGULAR MATRIX.  BOTH ARE
+    // ACCEPTED SINCE THEY PRODUCE IDENTICAL CARTESIAN COORDINATES.
+
+    bool upper_zero = (H[0][1] == 0 && H[0][2] == 0 && H[1][2] == 0);
+    bool lower_zero = (H[1][0] == 0 && H[2][0] == 0 && H[2][1] == 0);
+
+    if(!upper_zero && !lower_zero)
+    {
+        std::cerr << "AtomEye CFG: H0 matrix is not in restricted triclinic form." << std::endl;
+        std::cerr << "H0 must be upper-triangular (column convention) or" << std::endl;
+        std::cerr << "lower-triangular (row convention)." << std::endl;
+        exit(1);
+    }
+
+    if(upper_zero && lower_zero)
+    {
+        // DIAGONAL MATRIX: ORTHOGONAL CELL
+        triclinic_crystal_system = 0;
+        xy = xz = yz = 0;
+    }
+    else if(upper_zero)
+    {
+        // LOWER-TRIANGULAR: ROW CONVENTION (ROWS = LATTICE VECTORS)
+        triclinic_crystal_system = 1;
+        xy = H[1][0];
+        xz = H[2][0];
+        yz = H[2][1];
+    }
+    else
+    {
+        // UPPER-TRIANGULAR: COLUMN CONVENTION (COLUMNS = LATTICE VECTORS)
+        triclinic_crystal_system = 1;
+        xy = H[0][1];
+        xz = H[0][2];
+        yz = H[1][2];
+    }
+
+    xlo = 0;  xhi = H[0][0];
+    ylo = 0;  yhi = H[1][1];
+    zlo = 0;  zhi = H[2][2];
+
+    // NUMBER OF AUXILIARY PROPERTIES PER ATOM (AFTER x y z AND OPTIONAL vx vy vz)
+    int aux_count;
+    if(no_velocity) aux_count = entry_count - 3;
+    else            aux_count = entry_count - 6;
+
+    // SKIP AUXILIARY PROPERTY NAMES
+    for(int i = 0; i < aux_count; i++)
+        getline(fp, line);
+
+    // READ PARTICLE DATA.
+    // EACH SPECIES BLOCK BEGINS WITH A LINE: <mass> <symbol>
+    // FOLLOWED BY COORDINATE LINES FOR ATOMS OF THAT SPECIES.
+    // COORDINATE LINES: x y z [vx vy vz] [aux1 aux2 ...]
+    cif_coordinates.resize(3 * number_of_particles);
+    cif_types.resize(number_of_particles);
+
+    std::map<std::string, int> species_map;
+    int next_type = 1;
+    int current_type = 1;
+    int atoms_read = 0;
+
+    // NUMBER OF EXTRA VALUES TO SKIP PER COORDINATE LINE (VELOCITIES + AUXILIARIES)
+    int skip_count;
+    if(no_velocity) skip_count = aux_count;
+    else            skip_count = 3 + aux_count;
+
+    double Lx = xhi - xlo;
+    double Ly = yhi - ylo;
+    double Lz = zhi - zlo;
+
+    while(atoms_read < number_of_particles && getline(fp, line))
+    {
+        // SKIP BLANK LINES
+        size_t start = line.find_first_not_of(" \t\r");
+        if(start == std::string::npos) continue;
+
+        // DETERMINE IF THIS IS A SPECIES LINE OR A COORDINATE LINE.
+        // A SPECIES LINE HAS: <mass (number)> <symbol (alphabetic)>
+        // A COORDINATE LINE HAS: <x (number)> <y (number)> ...
+        std::istringstream iss(line);
+        double first_val;
+        iss >> first_val;
+
+        std::string second_token;
+        iss >> second_token;
+
+        if(!second_token.empty() && std::isalpha(second_token[0]))
+        {
+            // THIS IS A SPECIES LINE: mass symbol
+            if(species_map.find(second_token) == species_map.end())
+                species_map[second_token] = next_type++;
+            current_type = species_map[second_token];
+        }
+        else
+        {
+            // THIS IS A COORDINATE LINE
+            double fx = first_val;
+            double fy = second_token.empty() ? 0 : std::stod(second_token);
+            double fz;
+            iss >> fz;
+
+            // SKIP REMAINING VALUES ON LINE (VELOCITIES AND AUXILIARIES)
+            double junk;
+            for(int i = 0; i < skip_count; i++)
+                iss >> junk;
+
+            // WRAP FRACTIONAL COORDINATES INTO [0, 1)
+            fx = fmod(fx, 1.0); if(fx < 0) fx += 1.0;
+            fy = fmod(fy, 1.0); if(fy < 0) fy += 1.0;
+            fz = fmod(fz, 1.0); if(fz < 0) fz += 1.0;
+
+            // CONVERT FRACTIONAL TO CARTESIAN
+            double x, y, z;
+            if(triclinic_crystal_system)
+            {
+                x = fx * Lx + fy * xy + fz * xz;
+                y =           fy * Ly + fz * yz;
+                z =                     fz * Lz;
+            }
+            else
+            {
+                x = xlo + fx * Lx;
+                y = ylo + fy * Ly;
+                z = zlo + fz * Lz;
+            }
+
+            cif_coordinates[3 * atoms_read]     = x;
+            cif_coordinates[3 * atoms_read + 1] = y;
+            cif_coordinates[3 * atoms_read + 2] = z;
+            cif_types[atoms_read] = current_type;
+            atoms_read++;
+        }
+    }
+
+    if(atoms_read != number_of_particles)
+        throw std::runtime_error("AtomEye CFG: expected " + std::to_string(number_of_particles)
+                                 + " atoms but read " + std::to_string(atoms_read) + ".");
+}
+
+
+////////////////////////////////////////////////////
+////
 ////   PARSE HEADER: DETECT FILE FORMAT AND DISPATCH
 ////   TO THE APPROPRIATE PARSER.
 ////
 ////   LAMMPS dump: identified by "ITEM:" on line 1.
 ////   Extended XYZ: line 2 contains "Lattice=" or
 ////   "Properties=".
+////   AtomEye CFG: line 1 contains "Number of
+////   particles".
 ////   CIF: a line starts with "data_" or contains
 ////   "_cell_length_a".
 ////   POSCAR: line 2 is a single number and lines 3-5
@@ -1412,6 +1651,11 @@ void parse_header(std::ifstream& fp)
     {
         file_format = 2;  // EXTENDED XYZ
         parse_extended_xyz(fp);
+    }
+    else if (detect_lines[0].find("Number of particles") != std::string::npos)
+    {
+        file_format = 5;  // ATOMEYE CFG
+        parse_atomeye_cfg(fp);
     }
     else if ([&]() -> bool {
         // CIF: ANY OF THE FIRST 5 LINES STARTS WITH "data_" OR CONTAINS "_cell_length_a"
@@ -1501,7 +1745,8 @@ void parse_header(std::ifstream& fp)
 ////   IMPORT PARTICLE DATA FROM FILE.
 ////   HANDLES ABSOLUTE, SCALED, AND UNWRAPPED
 ////   COORDINATE TYPES.  WORKS FOR LAMMPS DUMP,
-////   LAMMPS DATA, EXTENDED XYZ, POSCAR, AND CIF.
+////   LAMMPS DATA, EXTENDED XYZ, POSCAR, CIF, AND
+////   ATOMEYE CFG.
 ////
 ////////////////////////////////////////////////////
 

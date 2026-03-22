@@ -26,7 +26,7 @@
 ### Features
 
 * **Fast and accurate tessellation:** Quickly perform Voronoi cell topological analysis for large sets of particles using multicore CPUs.
-* **Multiple file formats:** Automatically detects and reads LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, and CIF files. Both orthogonal and triclinic periodic cells are supported.
+* **Multiple file formats:** Automatically detects and reads LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, CIF, and AtomEye Extended CFG files. Both orthogonal and triclinic periodic cells are supported.
 * **Customizable analysis:** Extend VoroTop's functionality to perform specialized analyses relevant to your research.
 * **Encapsulated post-script (EPS) images:** Create high-quality vector EPS images of two-dimensional systems.
 * **Cross-platform compatibility:** Designed to compile and run on Linux, macOS, and Unix-like environments.

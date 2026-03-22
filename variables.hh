@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 1.0)              *   ////
+////   *             (Version 1.1)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *          Bar Ilan University           *   ////
@@ -51,7 +51,7 @@ extern int particles_in_eps;
 extern int perturbation_samples;
 extern double perturbation_size;
 
-extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA, 2 = EXTENDED XYZ, 3 = POSCAR, 4 = CIF
+extern int file_format;     // 0 = LAMMPS DUMP, 1 = LAMMPS DATA, 2 = EXTENDED XYZ, 3 = POSCAR, 4 = CIF, 5 = ATOMEYE CFG
 extern int header_lines;
 extern int particle_attributes;
 
