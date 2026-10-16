@@ -111,6 +111,8 @@ Further details, theoretical and practical, about Voronoi topology analysis of p
 
 * Lazar, E.A. and Rycroft, C.H., "*Structural identification in general crystalline systems via Voronoi cell topology*", [arXiv](https://arxiv.org/abs/2610.20498), 2026.
 
+* Lazar, E.A. and Rycroft, C.H., "*VoroTypes: automated enumeration of Voronoi cell topologies for structural identification of complex crystals in atomistic simulations*", [arXiv](https://arxiv.org/abs/2610.21911), 2026.
+
 * Lazar, E.A., Lu, J., Rycroft, C.H., and Schwarcz, D., "*Characterizing structural features of two-dimensional particle systems through Voronoi topology*", [arXiv](https://arxiv.org/abs/2406.00553), [Model. Simul. Mater. Sci. Eng. 32:085022](https://iopscience.iop.org/article/10.1088/1361-651X/ad8ad9), 2024. 
 
 * Lazar, E.A., Han, J. and Srolovitz, D.J. "*A Topological Framework for Local Structure Analysis in Condensed Matter*", [arXiv](https://arxiv.org/abs/1508.05937), [Proc. Natl. Acad. Sci. 112:E5769](https://www.pnas.org/doi/10.1073/pnas.1505788112), 2015.
