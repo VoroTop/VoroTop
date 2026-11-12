@@ -16,6 +16,7 @@
 * [Installation/Setup](#installationsetup)
     * [Prerequisites](#prerequisites)
     * [Compiling VoroTop](#compiling-vorotop)
+* [Python Interface: Burgers Vectors](#python-interface-burgers-vectors)
 * [Tutorial Through Examples](#tutorial)
 * [Publications](#publications)
 * [License](#license)
@@ -28,6 +29,7 @@
 * **Fast and accurate tessellation:** Quickly perform Voronoi cell topological analysis for large sets of particles using multicore CPUs.
 * **Multiple file formats:** Automatically detects and reads LAMMPS dump, LAMMPS data, Extended XYZ, VASP POSCAR/CONTCAR, CIF, and AtomEye Extended CFG files. Both orthogonal and triclinic periodic cells are supported.
 * **Customizable analysis:** Extend VoroTop's functionality to perform specialized analyses relevant to your research.
+* **Burgers vectors of dislocations:** The Python interface (`python/`) finds the dislocations in a crystal and returns their exact Burgers vectors, from the atoms and the ideal crystal structure alone.
 * **Encapsulated post-script (EPS) images:** Create high-quality vector EPS images of two-dimensional systems.
 * **Cross-platform compatibility:** Designed to compile and run on Linux, macOS, and Unix-like environments.
 
@@ -94,6 +96,19 @@ After installing `voro++` from the `dev` branch, follow these steps to compile V
         make CXX=g++-14       # Homebrew (version number may vary)
         ```
     * **Troubleshooting:** If you encounter compilation errors related to `voro++` headers or libraries, ensure that `voro++` was installed correctly and its header files (`voro++/src/voro++.hh`) and library files are discoverable by your compiler. You might need to set `CPATH` or `LIBRARY_PATH` environment variables, or ensure `sudo make install` correctly placed them.
+
+---
+
+### Python Interface: Burgers Vectors
+
+The folder [`python/`](python/README.md) holds VoroTop's Python interface. Its first analysis, `vorotop.burgers`, finds the dislocations in an atomistic configuration and returns their exact Burgers vectors. The only input besides the atoms is the ideal crystal structure, for example a CIF file. It installs on its own, with its own copy of `voro++`, so the `voro++` steps above are not needed for it:
+
+```bash
+pip install ./python
+vorotop-burgers dump.lammpstrj.gz --cif crystal.cif --types 1=Al,2=Cu
+```
+
+See [`python/README.md`](python/README.md) for the options, the output, and which crystals are supported.
 
 ---
 

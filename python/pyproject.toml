@@ -1,0 +1,20 @@
+[build-system]
+requires = ["scikit-build-core>=0.8"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "vorotop"
+version = "0.1.0"
+description = "VoroTop in Python: Burgers vectors of dislocations from Voronoi topology"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [{name = "Emanuel A. Lazar"}]
+requires-python = ">=3.9"
+dependencies = ["numpy", "scipy", "spglib>=2.0", "pymatgen"]
+
+[project.scripts]
+vorotop-burgers = "vorotop.burgers.cli:main"
+
+[tool.scikit-build]
+wheel.packages = ["src/vorotop"]
+cmake.build-type = "Release"
