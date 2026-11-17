@@ -10,7 +10,7 @@ matched cells are related by exact crystal symmetries; the atoms whose cells do 
 the Burgers vectors of each cluster are read from closed loops through the layer of crystal that encases it. See the
 paper for details and guarantees.
 
-> E. A. Lazar, *Burgers vectors from Voronoi topology* (2026). [reference to be added]
+> E. A. Lazar, *Burgers vectors from Voronoi topology*, submitted (2026).
 
 ## Install
 
@@ -75,13 +75,16 @@ for c in result["clusters"]:
 - **fcc and hcp metals**, through shipped tables of all perturbed cell topologies (hcp at the c/a ratio of Mg and at
   the ideal ratio). Orthogonal boxes only for now. A dissociated dislocation and its stacking fault form one cluster
   carrying the full vector.
+- **Other crystals with degenerate cells**, such as ω-Ti: every cell topology that small perturbations can produce
+  becomes a reference cell of its own. The enumeration needs [VoroTypes](https://github.com/VoroTop/VoroTypes)
+  installed (or `$VOROTYPES` pointing to a source checkout).
 
 ## Run time and memory
 
-On one node of two 18-core Xeon Gold 6240 processors with 16 threads (`--threads 16`), a snapshot takes about 7--9 s
-per million atoms for bcc metals and theta-Al2Cu, 11 s for fcc Cu, and up to 17 s for hcp Mg and dislocation
-networks in complex crystals, with 1.3--2 GB of memory per million atoms. Times grow in proportion to the number of
-atoms. They grow faster where one defect cluster holds a large part of the sample: close to melting, where the
+With 16 threads (`--threads 16`) on current Xeon nodes, a snapshot takes about 6--10 s per million atoms for bcc
+metals and theta-Al2Cu, 8--11 s for fcc Cu, and 13--18 s for hcp Mg, with about 1.4 GB of memory per million atoms
+(up to 2 GB for hcp metals and dislocation networks in complex crystals). Times grow in proportion to the number of
+atoms, tested up to 79 million. More than 16 threads currently gives little or no further gain. They grow faster where one defect cluster holds a large part of the sample: close to melting, where the
 non-crystalline atoms percolate, and around large faults attached to dislocation networks.
 
 ## Warnings the output can carry

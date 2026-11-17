@@ -4,7 +4,7 @@
 ////   *                                        *   ////
 ////   *     VoroTop: Voronoi Cell Topology     *   ////
 ////   *   Visualization and Analysis Toolkit   *   ////
-////   *             (Version 1.1)              *   ////
+////   *             (Version 1.2)              *   ////
 ////   *                                        *   ////
 ////   *           Emanuel A. Lazar             *   ////
 ////   *          Bar Ilan University           *   ////
@@ -37,7 +37,7 @@ void help_message(void) {
     "   *                                          *\n"
     "   *      VoroTop: Voronoi Cell Topology      *\n"
     "   *    Visualization and Analysis Toolkit    *\n"
-    "   *              (Version 1.1)               *\n"
+    "   *              (Version 1.2)               *\n"
     "   *                                          *\n"
     "   *            Emanuel A. Lazar              *\n"
     "   *           Bar Ilan University            *\n"
