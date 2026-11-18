@@ -10,7 +10,7 @@ matched cells are related by exact crystal symmetries; the atoms whose cells do 
 the Burgers vectors of each cluster are read from closed loops through the layer of crystal that encases it. See the
 paper for details and guarantees.
 
-> E. A. Lazar, *Burgers vectors from Voronoi topology*, submitted (2026).
+> E. A. Lazar, *Burgers vectors from Voronoi topology*, [arXiv:2611.22488](https://arxiv.org/abs/2611.22488) (2026).
 
 ## Install
 
